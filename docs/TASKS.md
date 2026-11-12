@@ -16,16 +16,16 @@ Rule: work one phase at a time. Tick boxes only after testing. After each phase,
 Done when: the welcome page opens at http://127.0.0.1:8000
 
 ## Phase 1 — Models and admin
-- [ ] Models: Tag, Post, Comment, Like (see `DATABASE.md`)
-- [ ] Migrations created and applied
-- [ ] Models registered in admin; superuser created
+- [x] Models: Tag, Post, Comment, Like (see `DATABASE.md`)
+- [x] Migrations created and applied
+- [x] Models registered in admin; superuser created
 Done when: you can create a Post with tags from the admin panel.
 
 ## Phase 2 — Authentication and post CRUD
-- [ ] Base template with Bootstrap and navbar
-- [ ] Register, login, logout pages
-- [ ] Post list (paginated) and detail pages
-- [ ] Create, edit, delete post (author only)
+- [x] Base template with Bootstrap and navbar
+- [x] Register, login, logout pages
+- [x] Post list (paginated) and detail pages
+- [x] Create, edit, delete post (author only)
 Done when: a new user can register, write, edit and delete their own post, and cannot edit others' posts.
 
 ## Phase 3 — Comments, likes, images
