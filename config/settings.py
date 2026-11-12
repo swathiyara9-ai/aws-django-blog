@@ -13,6 +13,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 
+from dotenv import load_dotenv
+load_dotenv()  # Load .env file from project root
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,13 +23,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-)2g=v*uxhao-*$str__!r78pk%2l^ph(9&g^6-ufnb)zsgdyhy'
+# Read SECRET_KEY from environment variable (required in production)
+# Generated for production use - keep this secret!
+SECRET_KEY = os.getenv('SECRET_KEY')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Read DEBUG from environment variable - default to False for security
+# When DEBUG=True, Django shows detailed error pages (not safe for production)
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = []
+# Allowed hosts - comma-separated list from environment
+# Required for Django's CSRF and Host header validation in production
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '').split(',') if host.strip()]
+
+# CSRF trusted origins - comma-separated list from environment
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()]
 
 
 # Application definition
@@ -75,13 +85,40 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# Configure database via environment variables for RDS support
+# When no DB_* variables are set, uses SQLite for local development
+# When DB_* variables are set, configures RDS/MySQL connection (drivers installed later)
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.sqlite3')
+DB_NAME = os.getenv('DB_NAME')
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+DB_HOST = os.getenv('DB_HOST')
+DB_PORT = os.getenv('DB_PORT')
+
+if DB_ENGINE and DB_NAME:
+    DATABASES = {
+        'default': {
+            'ENGINE': DB_ENGINE,
+            'NAME': DB_NAME,
+        }
     }
-}
+    if DB_USER:
+        DATABASES['default']['USER'] = DB_USER
+    if DB_PASSWORD:
+        DATABASES['default']['PASSWORD'] = DB_PASSWORD
+    if DB_HOST:
+        DATABASES['default']['HOST'] = DB_HOST
+    if DB_PORT:
+        DATABASES['default']['PORT'] = DB_PORT
+else:
+    # Default to SQLite for local development when no DB_* variables are set
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
