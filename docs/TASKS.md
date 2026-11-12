@@ -29,25 +29,25 @@ Done when: you can create a Post with tags from the admin panel.
 Done when: a new user can register, write, edit and delete their own post, and cannot edit others' posts.
 
 ## Phase 3 — Comments, likes, images
-- [ ] Comment form on post detail
-- [ ] Like / unlike button
-- [ ] Image upload (local `media/`)
-- [ ] Tag filter page
+- [x] Comment form on post detail
+- [x] Like / unlike button
+- [x] Image upload (local `media/`)
+- [x] Tag filter page
 Done when: images show on posts and comments and likes work.
 
 ## Phase 4 — Trending analytics (stage 1, local)
-- [ ] `analytics` app with PostView and PostStats
-- [ ] Record view on post detail (with simple de-duplication)
-- [ ] Score calculation service and management command `compute_trending`
-- [ ] Trending section on home page
+- [x] `analytics` app with PostView and PostStats
+- [x] Record view on post detail (with simple de-duplication)
+- [x] Score calculation service and management command `compute_trending`
+- [x] Trending section on home page
 Done when: opening, liking and commenting on posts changes the Trending order after running the command.
 
 ## Phase 5 — AI suggestions (Bedrock)
-- [ ] `ai_assist` app with `services.py`
+- [x] `ai_assist` app with `services.py`
 - [ ] AWS credentials configured locally; Bedrock model access confirmed
-- [ ] Endpoint returns JSON {titles, hashtags, summary}
-- [ ] "Suggest" button in editor; author can apply or ignore each suggestion
-- [ ] Error handling, input length limit, simple rate limit
+- [x] Endpoint returns JSON {titles, hashtags, summary}
+- [x] "Suggest" button in editor; author can apply or ignore each suggestion
+- [x] Error handling, input length limit, simple rate limit
 Done when: clicking Suggest fills the editor options, and the editor still works if Bedrock is unreachable.
 
 ## Phase 6 — Production readiness

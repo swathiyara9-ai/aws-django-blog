@@ -6,14 +6,17 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-9">
         <div class="card shadow-sm border-0">
             <div class="card-body p-4 p-md-5">
-                <h2 class="h3 fw-bold mb-4">
-                    {% if object %}Edit Post{% else %}Create a New Post{% endif %}
-                </h2>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="h3 fw-bold mb-0">
+                        {% if object %}Edit Post{% else %}Create a New Post{% endif %}
+                    </h2>
+                    <span class="badge bg-light text-muted border">Amazon Bedrock Ready</span>
+                </div>
 
-                <form method="post" novalidate>
+                <form method="post" enctype="multipart/form-data" novalidate id="post-form">
                     {% csrf_token %}
 
                     <!-- Title -->
@@ -34,12 +37,74 @@
                         {% endif %}
                     </div>
 
-                    <!-- Body -->
+                    <!-- Body with AI Suggest Button -->
                     <div class="mb-3">
-                        <label for="{{ form.body.id_for_label }}" class="form-label fw-semibold">Body Content</label>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label for="{{ form.body.id_for_label }}" class="form-label fw-semibold mb-0">Body Content</label>
+                            <button type="button" id="btn-ai-suggest" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1 shadow-sm">
+                                <span id="ai-btn-text">&#10024; Suggest with AI</span>
+                                <span id="ai-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                            </button>
+                        </div>
                         {{ form.body }}
                         {% if form.body.errors %}
                             <div class="text-danger small mt-1">{{ form.body.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- AI Suggestions Panel (Phase 5) -->
+                    <div id="ai-panel" class="card bg-light border-primary-subtle shadow-sm mb-4 d-none">
+                        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <strong class="small text-primary">&#10024; AI Suggestions</strong>
+                                <span id="ai-mode-badge" class="badge"></span>
+                            </div>
+                            <button type="button" class="btn-close btn-sm" id="btn-close-ai" aria-label="Close"></button>
+                        </div>
+                        <div class="card-body p-3">
+                            <div id="ai-error-alert" class="alert alert-warning py-2 small d-none" role="alert"></div>
+
+                            <div id="ai-content-sections">
+                                <!-- Suggested Titles -->
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold text-muted mb-1 text-uppercase">Suggested Titles (Click to apply)</label>
+                                    <div id="ai-titles-list" class="d-flex flex-column gap-2"></div>
+                                </div>
+
+                                <!-- Suggested Summary -->
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold text-muted mb-1 text-uppercase">Suggested Summary</label>
+                                    <div class="p-2 bg-white rounded border d-flex justify-content-between align-items-start gap-2">
+                                        <p id="ai-summary-text" class="small mb-0 text-secondary"></p>
+                                        <button type="button" id="btn-apply-summary" class="btn btn-sm btn-outline-success text-nowrap py-0 px-2" style="font-size: 0.75rem;">Apply</button>
+                                    </div>
+                                </div>
+
+                                <!-- Suggested Tags -->
+                                <div>
+                                    <label class="form-label small fw-bold text-muted mb-1 text-uppercase">Suggested Hashtags (Click to select)</label>
+                                    <div id="ai-tags-list" class="d-flex flex-wrap gap-1"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Image Upload -->
+                    <div class="mb-3">
+                        <label for="{{ form.image.id_for_label }}" class="form-label fw-semibold">Post Cover Image</label>
+                        {{ form.image }}
+                        <div class="form-text small text-muted">{{ form.image.help_text }}</div>
+                        {% if form.image.errors %}
+                            <div class="text-danger small mt-1">{{ form.image.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Image Alt Text -->
+                    <div class="mb-3">
+                        <label for="{{ form.image_alt.id_for_label }}" class="form-label fw-semibold">Image Alt Text <span class="text-muted fw-normal">(for accessibility/SEO)</span></label>
+                        {{ form.image_alt }}
+                        {% if form.image_alt.errors %}
+                            <div class="text-danger small mt-1">{{ form.image_alt.errors.0 }}</div>
                         {% endif %}
                     </div>
 
@@ -76,5 +141,191 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
+<!-- JavaScript for Asynchronous AI Suggestions -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btnSuggest = document.getElementById('btn-ai-suggest');
+    const btnText = document.getElementById('ai-btn-text');
+    const spinner = document.getElementById('ai-spinner');
+    const panel = document.getElementById('ai-panel');
+    const btnClose = document.getElementById('btn-close-ai');
+    const badgeMode = document.getElementById('ai-mode-badge');
+    const errorAlert = document.getElementById('ai-error-alert');
+    const contentSections = document.getElementById('ai-content-sections');
+    
+    const titlesList = document.getElementById('ai-titles-list');
+    const summaryText = document.getElementById('ai-summary-text');
+    const btnApplySummary = document.getElementById('btn-apply-summary');
+    const tagsList = document.getElementById('ai-tags-list');
+    
+    const inputTitle = document.getElementById('id_title');
+    const inputSummary = document.getElementById('id_summary');
+    const inputBody = document.getElementById('id_body');
+    const selectTags = document.getElementById('id_tags');
+
+    // Dismiss panel
+    btnClose.addEventListener('click', () => panel.classList.add('d-none'));
+
+    // Handle Suggest Button Click
+    btnSuggest.addEventListener('click', async function() {
+        const bodyContent = inputBody.value.trim();
+
+        // Graceful Client-side validation
+        if (bodyContent.length < 30) {
+            panel.classList.remove('d-none');
+            errorAlert.textContent = "Please write at least 30 characters in the post body before requesting AI suggestions.";
+            errorAlert.classList.remove('d-none');
+            contentSections.classList.add('d-none');
+            return;
+        }
+
+        // Set Loading state
+        btnSuggest.disabled = true;
+        btnText.textContent = "Generating...";
+        spinner.classList.remove('d-none');
+        panel.classList.remove('d-none');
+        errorAlert.classList.add('d-none');
+        contentSections.classList.add('d-none');
+
+        // Extract CSRF token from form
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        try {
+            const response = await fetch("{% url 'ai_suggest' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken,
+                },
+                body: JSON.stringify({ body: bodyContent })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "Failed to generate AI suggestions.");
+            }
+
+            // Display Mode Badge
+            if (data.mode === 'mock') {
+                badgeMode.className = "badge bg-warning text-dark border";
+                badgeMode.textContent = "Demo mode";
+                badgeMode.title = "Mock AI suggestions for preview. Real Bedrock path will run when AWS credentials are configured.";
+            } else {
+                badgeMode.className = "badge bg-success";
+                badgeMode.textContent = `AWS Bedrock (${data.model})`;
+            }
+
+            // 1. Populate Titles
+            titlesList.innerHTML = '';
+            data.suggestions.titles.forEach(title => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'btn btn-sm btn-outline-dark text-start py-1 px-2 d-flex justify-content-between align-items-center';
+                item.innerHTML = `<span>${title}</span> <span class="badge bg-secondary-subtle text-secondary small">Use</span>`;
+                item.addEventListener('click', () => {
+                    inputTitle.value = title;
+                    inputTitle.classList.add('is-valid');
+                    setTimeout(() => inputTitle.classList.remove('is-valid'), 1500);
+                });
+                titlesList.appendChild(item);
+            });
+
+            // 2. Populate Summary
+            summaryText.textContent = data.suggestions.summary;
+            btnApplySummary.onclick = () => {
+                inputSummary.value = data.suggestions.summary;
+                inputSummary.classList.add('is-valid');
+                setTimeout(() => inputSummary.classList.remove('is-valid'), 1500);
+            };
+
+            // 3. Populate Tags
+            tagsList.innerHTML = '';
+            data.suggestions.hashtags.forEach(tag => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'btn btn-sm btn-outline-primary py-1 px-2 d-inline-flex align-items-center gap-1';
+                
+                // Check if this tag is already in selectTags and selected
+                let isAlreadySelected = false;
+                for (let opt of selectTags.options) {
+                    if (opt.text.toLowerCase().replace('#', '').trim() === tag.toLowerCase() && opt.selected) {
+                        isAlreadySelected = true;
+                        break;
+                    }
+                }
+
+                if (isAlreadySelected) {
+                    chip.className = 'btn btn-sm btn-primary py-1 px-2 d-inline-flex align-items-center gap-1';
+                    chip.innerHTML = `<span>&#10003; #${tag}</span>`;
+                } else {
+                    chip.innerHTML = `<span>#${tag}</span>`;
+                }
+
+                chip.addEventListener('click', async () => {
+                    // Check if option already exists in the <select id="id_tags">
+                    let existingOpt = null;
+                    for (let opt of selectTags.options) {
+                        if (opt.text.toLowerCase().replace('#', '').trim() === tag.toLowerCase()) {
+                            existingOpt = opt;
+                            break;
+                        }
+                    }
+
+                    if (existingOpt) {
+                        // Toggle selection
+                        existingOpt.selected = !existingOpt.selected;
+                        if (existingOpt.selected) {
+                            chip.className = 'btn btn-sm btn-primary py-1 px-2 d-inline-flex align-items-center gap-1';
+                            chip.innerHTML = `<span>&#10003; #${tag}</span>`;
+                        } else {
+                            chip.className = 'btn btn-sm btn-outline-primary py-1 px-2 d-inline-flex align-items-center gap-1';
+                            chip.innerHTML = `<span>#${tag}</span>`;
+                        }
+                    } else {
+                        // Tag not yet in DB; ensure it via API, add to select, and select it!
+                        try {
+                            chip.disabled = true;
+                            const ensureRes = await fetch("{% url 'ai_ensure_tag' %}", {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': csrfToken,
+                                },
+                                body: JSON.stringify({ tag: tag })
+                            });
+                            const ensureData = await ensureRes.json();
+                            if (ensureData.success) {
+                                const newOpt = new Option('#' + ensureData.name, ensureData.id, true, true);
+                                selectTags.add(newOpt);
+                                chip.className = 'btn btn-sm btn-primary py-1 px-2 d-inline-flex align-items-center gap-1';
+                                chip.innerHTML = `<span>&#10003; #${tag}</span>`;
+                            }
+                        } catch (err) {
+                            console.error("Error creating tag:", err);
+                        } finally {
+                            chip.disabled = false;
+                        }
+                    }
+                });
+                tagsList.appendChild(chip);
+            });
+
+            contentSections.classList.remove('d-none');
+
+        } catch (err) {
+            // Graceful degradation: show error message without disrupting typing
+            errorAlert.textContent = `${err.message} You can continue writing and editing your post manually.`;
+            errorAlert.classList.remove('d-none');
+            contentSections.classList.add('d-none');
+        } finally {
+            // Restore button state
+            btnSuggest.disabled = false;
+            btnText.textContent = "\u2728 Suggest with AI";
+            spinner.classList.add('d-none');
+        }
+    });
+});
+</script>
+{% endblock %}

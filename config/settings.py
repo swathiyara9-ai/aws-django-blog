@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,6 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'blog',
+    'analytics',
+    'ai_assist',
 ]
 
 MIDDLEWARE = [
@@ -130,4 +133,23 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'post_list'
 LOGOUT_REDIRECT_URL = 'post_list'
+
+# Amazon Bedrock AI Settings
+AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+BEDROCK_MODEL_ID = os.getenv('BEDROCK_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0')
+
+def _determine_mock_mode():
+    val = os.getenv('AI_MOCK_MODE', '').strip().lower()
+    if val in ('false', '0', 'no'):
+        return False
+    if val in ('true', '1', 'yes'):
+        return True
+    # Default to True when no AWS credentials are found
+    has_aws_keys = bool(os.getenv('AWS_ACCESS_KEY_ID') and os.getenv('AWS_SECRET_ACCESS_KEY'))
+    aws_config_file = Path.home() / '.aws' / 'credentials'
+    if has_aws_keys or aws_config_file.exists():
+        return False
+    return True
+
+AI_MOCK_MODE = _determine_mock_mode()
 
