@@ -5,8 +5,8 @@ Rule: work one phase at a time. Tick boxes only after testing. After each phase,
 ## Open decisions
 - [ ] Infrastructure as code tool: Terraform or CloudFormation
 - [ ] Database engine on RDS: MySQL or PostgreSQL
-- [ ] AWS region (check Bedrock model availability first)
-- [ ] Bedrock model to use
+- [x] AWS region: `ap-southeast-2` (Sydney)
+- [x] Bedrock model to use: Amazon Nova Lite (`amazon.nova-lite-v1:0`, IAM ARN: `arn:aws:bedrock:ap-southeast-2::foundation-model/amazon.nova-lite-v1:0`)
 
 ## Phase 0 — Local setup
 - [ ] Python 3.10+ installed, virtual environment created
@@ -51,10 +51,10 @@ Done when: opening, liking and commenting on posts changes the Trending order af
 Done when: clicking Suggest fills the editor options, and the editor still works if Bedrock is unreachable.
 
 ## Phase 6 — Production readiness
-- [ ] Settings split by environment variables (`DEBUG`, `SECRET_KEY`, `ALLOWED_HOSTS`, DB, bucket, `BEDROCK_MODEL_ID`)
-- [ ] Gunicorn, WhiteNoise or S3 for static files
-- [ ] `requirements.txt` pinned; `collectstatic` works
-- [ ] Health check URL `/health/`
+- [x] Settings split by environment variables (`DEBUG`, `SECRET_KEY`, `ALLOWED_HOSTS`, DB, bucket, `BEDROCK_MODEL_ID`)
+- [x] Gunicorn, WhiteNoise or S3 for static files
+- [x] `requirements.txt` pinned; `collectstatic` works
+- [x] Health check URL `/health/`
 Done when: the app runs locally in production-like mode with `DEBUG=False`.
 
 ## Phase 7 — AWS networking and safety

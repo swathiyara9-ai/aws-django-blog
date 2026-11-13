@@ -13,19 +13,18 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 
-from dotenv import load_dotenv
-load_dotenv()  # Load .env file from project root
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables from .env file in project root
+from dotenv import load_dotenv
+load_dotenv(BASE_DIR / '.env')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # Read SECRET_KEY from environment variable (required in production)
-# Generated for production use - keep this secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-fallback-key')
 
 # Read DEBUG from environment variable - default to False for security
 # When DEBUG=True, Django shows detailed error pages (not safe for production)
@@ -55,6 +54,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -87,30 +87,26 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 # Configure database via environment variables for RDS support
 # When no DB_* variables are set, uses SQLite for local development
-# When DB_* variables are set, configures RDS/MySQL connection (drivers installed later)
+# When DB_* variables are set, configures RDS connection (drivers installed in Phase 8)
 
-DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.sqlite3')
+DB_ENGINE = os.getenv('DB_ENGINE')
 DB_NAME = os.getenv('DB_NAME')
 DB_USER = os.getenv('DB_USER')
 DB_PASSWORD = os.getenv('DB_PASSWORD')
 DB_HOST = os.getenv('DB_HOST')
 DB_PORT = os.getenv('DB_PORT')
 
-if DB_ENGINE and DB_NAME:
+if any([DB_ENGINE, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT]):
     DATABASES = {
         'default': {
-            'ENGINE': DB_ENGINE,
-            'NAME': DB_NAME,
+            'ENGINE': DB_ENGINE or 'django.db.backends.postgresql',
+            'NAME': DB_NAME or 'blogdb',
+            'USER': DB_USER or '',
+            'PASSWORD': DB_PASSWORD or '',
+            'HOST': DB_HOST or 'localhost',
+            'PORT': DB_PORT or '5432',
         }
     }
-    if DB_USER:
-        DATABASES['default']['USER'] = DB_USER
-    if DB_PASSWORD:
-        DATABASES['default']['PASSWORD'] = DB_PASSWORD
-    if DB_HOST:
-        DATABASES['default']['HOST'] = DB_HOST
-    if DB_PORT:
-        DATABASES['default']['PORT'] = DB_PORT
 else:
     # Default to SQLite for local development when no DB_* variables are set
     DATABASES = {
@@ -156,6 +152,17 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Production static files storage with WhiteNoise compression and caching
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Media files (User uploaded content)
 MEDIA_URL = '/media/'
@@ -172,8 +179,8 @@ LOGIN_REDIRECT_URL = 'post_list'
 LOGOUT_REDIRECT_URL = 'post_list'
 
 # Amazon Bedrock AI Settings
-AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
-BEDROCK_MODEL_ID = os.getenv('BEDROCK_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0')
+AWS_REGION = os.getenv('AWS_REGION', 'ap-southeast-2')
+BEDROCK_MODEL_ID = os.getenv('BEDROCK_MODEL_ID', 'amazon.nova-lite-v1:0')
 
 def _determine_mock_mode():
     val = os.getenv('AI_MOCK_MODE', '').strip().lower()
@@ -190,3 +197,7 @@ def _determine_mock_mode():
 
 AI_MOCK_MODE = _determine_mock_mode()
 
+import sys
+if "test" in sys.argv:
+    # Fast password hasher for tests only (never used in production)
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

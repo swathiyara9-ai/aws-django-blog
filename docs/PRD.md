@@ -6,7 +6,7 @@ Build a scalable, secure and reliable blog application on AWS using Django, and 
 ## 2. What is new in this project
 Many public AWS capstones deploy a Django blog behind an ALB with Auto Scaling, RDS, S3, CloudFront and Lambda. This project keeps that solid base and adds:
 1. **Trending analytics** — a score from views, likes and comments with time decay, shown as a Trending section.
-2. **AI writing assistant (Bedrock)** — suggests titles, hashtags and a summary while the author writes.
+2. **AI writing assistant (Bedrock)** — suggests titles, hashtags and a summary while the author writes using Amazon Nova Lite (`amazon.nova-lite-v1:0` in `ap-southeast-2`). IAM policy requires `bedrock:InvokeModel` scoped to `arn:aws:bedrock:ap-southeast-2::foundation-model/amazon.nova-lite-v1:0`.
 3. **AI-assisted image alt-text and comment moderation** (optional stretch, via S3-triggered / event Lambda).
 4. **Infrastructure as code** for repeatable deployment (Terraform or CloudFormation).
 

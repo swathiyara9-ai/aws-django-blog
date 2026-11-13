@@ -104,15 +104,15 @@ Rules for every phase:
 
 **Steps**
 1. `pip install boto3`; run `aws configure` (use an IAM user or profile with minimal Bedrock permission, not your root account).
-2. In the AWS console, confirm the chosen Bedrock model is available and enabled in your region.
+2. In the AWS console, confirm the chosen Bedrock model (Amazon Nova Lite `amazon.nova-lite-v1:0` in `ap-southeast-2`) is available and enabled in your region.
 3. `python manage.py startapp ai_assist`.
-4. `ai_assist/services.py`: build a prompt from the post body; call Bedrock Runtime; ask for **JSON only** with keys `titles` (3–5), `hashtags` (5–8), `summary` (one line); parse and validate.
+4. `ai_assist/services.py`: build a prompt from the post body; call Bedrock Runtime via the Converse API; ask for **JSON only** with keys `titles` (3–5), `hashtags` (5–8), `summary` (one line); parse with `json.JSONDecoder().raw_decode` and validate.
 5. Endpoint `POST /ai/suggest/` (login required): check input length, apply a simple per-user rate limit, return JSON.
 6. In the editor template, a Suggest button uses `fetch()` (with the CSRF token) and shows clickable suggestions that fill the title, tags and summary fields.
 7. Handle failures: timeout, throttling, invalid JSON → friendly message; the editor must still save posts.
-8. Put the model id in a setting, `BEDROCK_MODEL_ID`, read from an environment variable.
+8. Put the model id in a setting, `BEDROCK_MODEL_ID` (default `amazon.nova-lite-v1:0`), and region `AWS_REGION` (default `ap-southeast-2`), read from environment variables.
 
-**Concepts:** boto3 client, IAM permissions (`bedrock:InvokeModel`), prompt design, structured output, input validation, rate limiting, graceful degradation.
+**Concepts:** boto3 client, Converse API, IAM permissions (`bedrock:InvokeModel` scoped strictly to `arn:aws:bedrock:ap-southeast-2::foundation-model/amazon.nova-lite-v1:0`), prompt design, structured output, input validation, rate limiting, graceful degradation.
 **Test:** Suggestions appear for a long post; a very short post shows a helpful message; with credentials removed the editor still works and shows an error message.
 **Interview Q:** How do you handle the AI returning malformed output? How do you control cost?
 
@@ -167,7 +167,7 @@ Rules for every phase:
 2. Install the DB driver (`mysqlclient` or `psycopg2-binary`) and set the DB environment variables.
 3. S3: create a media bucket with **Block Public Access ON**.
 4. `pip install django-storages`; configure the S3 storage backend for media.
-5. IAM role (instance profile) for EC2 allowing only: read/write to that bucket and `bedrock:InvokeModel`.
+5. IAM role (instance profile) for EC2 allowing only: read/write to that bucket and `bedrock:InvokeModel` scoped strictly to `arn:aws:bedrock:ap-southeast-2::foundation-model/amazon.nova-lite-v1:0`.
 6. Launch one test EC2 instance in a subnet with this role; run migrations against RDS; create a post with an image.
 
 **Concepts:** managed databases, subnet groups, IAM roles vs access keys, least privilege, object storage.

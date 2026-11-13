@@ -41,7 +41,7 @@
 | CloudFront | CDN and HTTPS front door | Local copy shops near readers worldwide |
 | Lambda | Small event-driven functions | A helper who wakes up only when called |
 | API Gateway + DynamoDB | Serverless event counting (analytics upgrade) | Fast tally counter that scales by itself |
-| Bedrock | Generative AI for suggestions | The writing assistant |
+| Bedrock | Generative AI suggestions via Amazon Nova Lite (ap-southeast-2) | The writing assistant |
 | IAM roles | Permissions for EC2 and Lambda | An ID badge with limited access |
 | CloudWatch | Logs, metrics, alarms | Security cameras and alarms |
 | ACM | Free TLS certificates | The padlock on the website |
@@ -51,7 +51,7 @@
 Browser -> ALB -> Django -> saves text in RDS, image in S3 (via django-storages) -> page served; image URL goes through CloudFront.
 
 **B. AI suggestions**
-Editor "Suggest" click -> Django endpoint -> `ai_assist/services.py` -> Bedrock Runtime (IAM role) -> JSON {titles, hashtags, summary} -> shown in editor; author chooses.
+Editor "Suggest" click -> Django endpoint -> `ai_assist/services.py` -> Bedrock Runtime Converse API (Amazon Nova Lite `amazon.nova-lite-v1:0` in `ap-southeast-2`) -> JSON {titles, hashtags, summary} -> shown in editor; author chooses.
 
 **C. View counting and trending (two stages)**
 - Stage 1 (local, simple): Django records a `PostView` row; an hourly management command/cron computes scores into `PostStats`.
@@ -64,7 +64,7 @@ S3 upload event -> Lambda -> Bedrock (describe image) -> writes alt-text back to
 - Security group chain: Internet -> ALB (80/443) -> EC2 (app port, from ALB SG only) -> RDS (3306/5432, from EC2 SG only).
 - RDS not publicly accessible; EC2 in private subnets; outbound internet via NAT Gateway or VPC endpoints (see cost note).
 - VPC Gateway Endpoint for S3 keeps S3 traffic off the public internet.
-- IAM role on EC2: least-privilege access to the media bucket and `bedrock:InvokeModel` for the chosen model.
+- IAM role on EC2: least-privilege access to the media bucket and `bedrock:InvokeModel` scoped strictly to `arn:aws:bedrock:ap-southeast-2::foundation-model/amazon.nova-lite-v1:0`.
 - Secrets in environment variables or Secrets Manager; `DEBUG=False` in production.
 
 ## 5. Cost notes (read before building)

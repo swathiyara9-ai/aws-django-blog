@@ -62,7 +62,7 @@ class AIAssistTests(TestCase):
         self.assertTrue(isinstance(suggestions['summary'], str))
         self.assertGreater(len(suggestions['summary']), 10)
 
-    @override_settings(AI_MOCK_MODE=False, AWS_REGION='us-east-1', BEDROCK_MODEL_ID='anthropic.claude-3-haiku-20240307-v1:0')
+    @override_settings(AI_MOCK_MODE=False, AWS_REGION='ap-southeast-2', BEDROCK_MODEL_ID='amazon.nova-lite-v1:0')
     @patch('boto3.client')
     def test_real_bedrock_converse_path_with_mocked_boto3(self, mock_boto3_client):
         """Verify the real Bedrock Converse API invocation and schema validation."""
@@ -103,18 +103,69 @@ class AIAssistTests(TestCase):
         data = response.json()
         self.assertTrue(data['success'])
         self.assertEqual(data['mode'], 'bedrock')
-        self.assertEqual(data['model'], 'anthropic.claude-3-haiku-20240307-v1:0')
+        self.assertEqual(data['model'], 'amazon.nova-lite-v1:0')
+        self.assertEqual(data['region'], 'ap-southeast-2')
         self.assertEqual(data['suggestions']['titles'][0], "Deploying High Availability Django on AWS")
         self.assertEqual(data['suggestions']['hashtags'], ["aws", "django", "cloud", "devops", "python"])
 
         # Verify Converse API was called with the configured model
         mock_bedrock.converse.assert_called_once()
         call_kwargs = mock_bedrock.converse.call_args[1]
-        self.assertEqual(call_kwargs['modelId'], 'anthropic.claude-3-haiku-20240307-v1:0')
+        self.assertEqual(call_kwargs['modelId'], 'amazon.nova-lite-v1:0')
+        self.assertEqual(mock_boto3_client.call_args[1]['region_name'], 'ap-southeast-2')
 
-    @override_settings(AI_MOCK_MODE=False, AWS_REGION='us-east-1')
+    @override_settings(AI_MOCK_MODE=False, AWS_REGION='ap-southeast-2', BEDROCK_MODEL_ID='amazon.nova-lite-v1:0')
     @patch('boto3.client')
-    def test_bedrock_outage_graceful_degradation(self, mock_boto3_client):
+    def test_bedrock_response_with_greeting_and_code_fences(self, mock_boto3_client):
+        """Verify resilient JSON raw_decode handling greetings, markdown fences, and trailing prose."""
+        self.client.login(username='dave', password='password123')
+
+        mock_bedrock = MagicMock()
+        mock_boto3_client.return_value = mock_bedrock
+
+        messy_ai_output = (
+            "Here are your suggestions for this article:\n"
+            "```json\n"
+            "{\n"
+            '  "titles": ["Mastering Amazon Nova Lite", "Serverless Django on AWS", "Cost Optimization 101"],\n'
+            '  "hashtags": ["#NovaLite", "#AWS", "#Cloud", "#Django", "#Architecture"],\n'
+            '  "summary": "A deep dive into cost-effective AI integration with Amazon Nova Lite."\n'
+            "}\n"
+            "```\n"
+            "Hope this helps with your publication workflow!"
+        )
+
+        mock_bedrock.converse.return_value = {
+            'output': {
+                'message': {
+                    'content': [
+                        {'text': messy_ai_output}
+                    ]
+                }
+            }
+        }
+
+        body = "A technical draft analyzing cost optimization when utilizing Amazon Nova Lite foundation models."
+        response = self.client.post(
+            self.suggest_url,
+            data=json.dumps({'body': body}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['mode'], 'bedrock')
+        self.assertEqual(data['model'], 'amazon.nova-lite-v1:0')
+        self.assertEqual(data['region'], 'ap-southeast-2')
+        # Cleaned tags should have '#' removed and lowercased
+        self.assertEqual(data['suggestions']['hashtags'], ["novalite", "aws", "cloud", "django", "architecture"])
+        self.assertEqual(len(data['suggestions']['titles']), 3)
+
+    @override_settings(AI_MOCK_MODE=False, AWS_REGION='ap-southeast-2')
+    @patch('time.sleep', return_value=None)
+    @patch('boto3.client')
+    def test_bedrock_outage_graceful_degradation(self, mock_boto3_client, mock_sleep):
         """Simulate Bedrock Throttling or Outage: API returns clean 400 error, never a 500 crash."""
         self.client.login(username='dave', password='password123')
 
@@ -138,6 +189,36 @@ class AIAssistTests(TestCase):
         data = response.json()
         self.assertFalse(data['success'])
         self.assertIn('ThrottlingException', data['error'])
+
+    @override_settings(AI_MOCK_MODE=False, AWS_REGION='ap-southeast-2')
+    @patch('boto3.client')
+    def test_bedrock_malformed_json_returns_friendly_error(self, mock_boto3_client):
+        """When AI returns non-JSON or conversational refusal, return friendly 400 without crashing."""
+        self.client.login(username='dave', password='password123')
+
+        mock_bedrock = MagicMock()
+        mock_boto3_client.return_value = mock_bedrock
+        mock_bedrock.converse.return_value = {
+            'output': {
+                'message': {
+                    'content': [
+                        {'text': "I am sorry, but I cannot fulfill this request."}
+                    ]
+                }
+            }
+        }
+
+        body = "Testing what happens when AI output contains no JSON structure."
+        response = self.client.post(
+            self.suggest_url,
+            data=json.dumps({'body': body}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertIn('No valid JSON object found', data['error'])
 
     def test_rate_limiting_enforcement(self):
         """Sending more than 5 requests in a minute returns HTTP 429."""

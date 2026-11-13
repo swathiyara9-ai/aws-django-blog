@@ -121,8 +121,8 @@ def _invoke_bedrock(body_text: str) -> Dict[str, Any]:
             ],
             system=[{"text": system_prompt}],
             inferenceConfig={
-                "temperature": 0.7,
-                "maxTokens": 600,
+                "temperature": 0.5,
+                "maxTokens": 400,
             }
         )
 
@@ -133,32 +133,51 @@ def _invoke_bedrock(body_text: str) -> Dict[str, Any]:
 
         raw_text = content_blocks[0]['text'].strip()
 
-        # Clean optional markdown code block fences (e.g. ```json ... ```)
-        if raw_text.startswith("```"):
-            raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
-            raw_text = re.sub(r"\s*```$", "", raw_text)
+        # Find the first '{' to ignore conversational greetings or leading code fences
+        start_idx = raw_text.find('{')
+        if start_idx == -1:
+            raise AISuggestionError("No valid JSON object found in AI response.")
 
-        data = json.loads(raw_text)
+        # Parse exactly one complete JSON object from the opening brace
+        try:
+            decoder = json.JSONDecoder()
+            data, _ = decoder.raw_decode(raw_text[start_idx:])
+        except json.JSONDecodeError:
+            raise AISuggestionError("AI returned an invalid JSON response. Please try again.")
 
-        # Schema validation
-        if not isinstance(data.get('titles'), list) or not data['titles']:
-            raise AISuggestionError("AI output missing 'titles' list.")
-        if not isinstance(data.get('hashtags'), list) or not data['hashtags']:
-            raise AISuggestionError("AI output missing 'hashtags' list.")
-        if not isinstance(data.get('summary'), str):
-            raise AISuggestionError("AI output missing 'summary' string.")
+        # Schema & count validation
+        if not isinstance(data, dict):
+            raise AISuggestionError("AI response was not a valid JSON object.")
 
-        # Clean tags (strip '#' and whitespace)
-        data['hashtags'] = [
+        titles = data.get('titles')
+        if not isinstance(titles, list) or not titles:
+            raise AISuggestionError("AI output missing or invalid 'titles' list.")
+
+        hashtags = data.get('hashtags')
+        if not isinstance(hashtags, list) or not hashtags:
+            raise AISuggestionError("AI output missing or invalid 'hashtags' list.")
+
+        summary = data.get('summary')
+        if not isinstance(summary, str) or not summary.strip():
+            raise AISuggestionError("AI output missing or invalid 'summary' string.")
+
+        # Clean and validate contents
+        clean_titles = [str(t).strip() for t in titles if str(t).strip()]
+        if not clean_titles:
+            raise AISuggestionError("AI output did not contain valid title strings.")
+
+        clean_tags = [
             str(tag).strip().lstrip('#').lower() 
-            for tag in data['hashtags'] 
-            if tag
+            for tag in hashtags 
+            if str(tag).strip()
         ]
+        if not clean_tags:
+            raise AISuggestionError("AI output did not contain valid hashtag strings.")
 
         return {
-            "titles": data['titles'][:5],
-            "hashtags": data['hashtags'][:8],
-            "summary": data['summary'][:300],
+            "titles": clean_titles[:5],
+            "hashtags": clean_tags[:8],
+            "summary": str(summary).strip()[:300],
         }
 
     except ClientError as e:
@@ -193,6 +212,7 @@ def get_ai_suggestions(body_text: str) -> Dict[str, Any]:
     return {
         "mode": mode,
         "model": settings.BEDROCK_MODEL_ID,
+        "region": settings.AWS_REGION,
         "suggestions": suggestions,
     }
 

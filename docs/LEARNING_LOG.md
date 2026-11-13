@@ -123,7 +123,7 @@ After every phase, add an entry. Keep answers in your own words.
 ## Phase 5 — AI suggestions (Bedrock) (November 12, 2026)
 **What I built:** Integrated AI writing assistant with an asynchronous UI in the post editor. Features a dual-engine architecture: an offline content-aware mock generator (`AI_MOCK_MODE=True`) and the modern Amazon Bedrock Converse API (`boto3`) with model ID configured via environment variables. Includes a dynamic hashtag creation endpoint (`/ai/tag/ensure/`), input length boundaries, per-user rate limiting (5 req/min), and an expanded 26-test suite using `unittest.mock`.
 **New concepts:**
-- Amazon Bedrock & Bedrock Runtime — Managed, serverless AWS service providing API access to foundation models (Claude, Titan) governed by IAM policies without provisioning GPU infrastructure.
+- Amazon Bedrock & Bedrock Runtime — Managed, serverless AWS service providing API access to foundation models like Amazon Nova Lite (`amazon.nova-lite-v1:0`) and Titan governed by IAM policies without provisioning GPU infrastructure.
 - Bedrock Converse API — The unified, model-agnostic AWS SDK interface for conversational and instruction-based model invocations.
 - Prompt Engineering & Structured JSON Output — Constraining LLM generation to return strict, machine-readable JSON payloads (`titles`, `hashtags`, `summary`) matching web form schemas.
 - Graceful Degradation — Building resilient systems that remain operational when third-party or cloud dependencies fail or throttle, ensuring users can continue writing manually.
@@ -137,5 +137,27 @@ After every phase, add an entry. Keep answers in your own words.
 2. Q: What is graceful degradation, and how is it implemented in this AI assistant?
    A: Graceful degradation ensures that if an external component or network call fails, the core user experience continues without crashing. If Bedrock is unreachable or throttled, our API catches the exception and returns a friendly error message to the editor UI. The author is informed without losing any draft content and can proceed to write and publish their post manually.
 3. Q: Why does the system use the Bedrock Converse API rather than model-specific invoke commands?
-   A: Older Bedrock integrations required model-specific request and response JSON payloads (e.g. Anthropic Claude required different parameters than Amazon Titan or Meta Llama). The modern Converse API provides a unified, cross-model standard, allowing the application to switch underlying foundation models via the `BEDROCK_MODEL_ID` environment variable without altering application code.
+   A: Older Bedrock integrations required model-specific request and response JSON payloads (e.g. Anthropic Claude required different parameters than Amazon Titan or Meta Llama). The modern Converse API provides a unified, cross-model standard, allowing the application to switch underlying foundation models (such as Amazon Nova Lite) via the `BEDROCK_MODEL_ID` environment variable without altering application code.
 **Can I honestly put this on my resume?** Yes — Built an AI editorial assistant integrating Amazon Bedrock Runtime (Converse API) with fallback mock engines, structured JSON prompt engineering, and resilient client-side error handling.
+
+
+---
+
+## Phase 6 — Production readiness (November 12, 2026)
+**What I built:** Fully decoupled production-grade configuration using `.env` and `python-dotenv` with a safe, committed `.env.example` template. Generated a fresh cryptographically secure `SECRET_KEY`, enforced `DEBUG=False` as secure-by-default, enabled dynamic database routing (SQLite locally, RDS on AWS), integrated WhiteNoise with content-hashed manifest compression (`collectstatic` bundled 127 assets), added an ALB `/health/` endpoint, and tested local production serving via Waitress WSGI.
+**New concepts:**
+- 12-Factor App Configuration — Storing credentials, secrets, and environment flags in environment variables so the same codebase runs unmodified across dev, test, and production.
+- Security Impact of `DEBUG=True` — Preventing stack trace disclosures that leak passwords, file paths, and secret keys to external visitors.
+- WhiteNoise — A WSGI middleware that serves static files directly from Python with gzip/brotli compression and cache-busting manifest hashes without requiring a separate web server.
+- WSGI Servers (Gunicorn vs. Waitress vs. `runserver`) — Understanding multi-process POSIX architectures (`gunicorn`) for Linux/EC2 vs. multi-threaded cross-platform servers (`waitress`) for Windows vs. unoptimized development servers (`runserver`).
+- Load Balancer Health Checks — The mechanism used by an Application Load Balancer to continuously monitor server health and reroute traffic away from crashed instances.
+**Problems faced and fixes:**
+- Uploaded media images returned 404 when `DEBUG=False`: WhiteNoise only serves static files (`/static/`), not user uploads (`/media/`), and Django's `static()` helper disables itself when `DEBUG=False`. Fixed by routing `re_path(r'^media/(?P<path>.*)$', serve, ...)` to ensure local media displays during local production testing until Amazon S3 is connected in Phase 8.
+**Likely questions and my answers:**
+1. Q: Why shouldn't you run `python manage.py runserver` in production, and why can't Gunicorn run natively on Windows?
+   A: `runserver` is a single-threaded server intended solely for local development; it is unhardened against denial-of-service attacks and cannot handle concurrent connections. In production, we run a WSGI server like Gunicorn on Linux. Gunicorn relies on POSIX system calls (`fork()` and `fcntl()`) to manage worker processes, which do not exist on Windows. On Windows development environments, we test with Waitress (a multi-threaded production WSGI server) and specify `gunicorn; sys_platform != "win32"` in `requirements.txt` for our target AWS EC2 Linux servers.
+2. Q: Why is `DEBUG = True` dangerous in production?
+   A: When an unhandled error occurs with `DEBUG = True`, Django presents a diagnostic screen revealing the entire request environment: secret keys, database credentials, server paths, and code context. Attackers can leverage this information to exploit the system. Setting `DEBUG = False` ensures errors show generic, safe pages while details are sent to internal logs.
+3. Q: What is the purpose of the `/health/` endpoint and how does an AWS ALB use it?
+   A: The `/health/` endpoint returns HTTP 200 OK to indicate that the application is alive and ready to process traffic. The AWS Application Load Balancer (ALB) pings this URL periodically (e.g. every 15–30 seconds). If an EC2 instance becomes unresponsive or returns error codes, the ALB stops sending web requests to that instance and signals the Auto Scaling Group to replace it with a healthy instance.
+**Can I honestly put this on my resume?** Yes — Prepared a Django application for cloud deployment following 12-factor principles, configured WhiteNoise static file compression, implemented ALB health-check endpoints, and decoupled environment configurations for AWS RDS and Bedrock.

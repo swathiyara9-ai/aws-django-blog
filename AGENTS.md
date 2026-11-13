@@ -22,7 +22,7 @@ Swathi is a third-year B.Tech IT student. She is learning AWS and Django while b
 - Django built-in auth, ORM, admin, forms. Server-rendered templates with Bootstrap. No separate frontend framework.
 - SQLite locally; MySQL or PostgreSQL on RDS. Settings must switch by environment variable.
 - Media: local `media/` in development, S3 (django-storages) in production.
-- AI: `boto3` Bedrock Runtime. Model id comes from the `BEDROCK_MODEL_ID` setting, never hard-coded in views.
+- AI: `boto3` Bedrock Runtime using Amazon Nova Lite (`amazon.nova-lite-v1:0` in `ap-southeast-2`). Model id comes from the `BEDROCK_MODEL_ID` setting, never hard-coded in views. IAM policy requires `bedrock:InvokeModel` scoped strictly to `arn:aws:bedrock:ap-southeast-2::foundation-model/amazon.nova-lite-v1:0`.
 - Infrastructure as code: Terraform or CloudFormation (decision pending, see TASKS.md).
 
 ## Do not

@@ -234,3 +234,11 @@ class PostCRUDAndAuthTests(TestCase):
             import os
             if os.path.exists(post.image.path):
                 os.remove(post.image.path)
+
+    def test_health_check_endpoint(self):
+        """ALB health check endpoint returns HTTP 200 OK without requiring authentication."""
+        response = self.client.get('/health/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data.get('status'), 'ok')
+        self.assertEqual(data.get('app'), 'aws-django-blog')

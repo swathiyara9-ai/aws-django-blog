@@ -214,7 +214,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 badgeMode.title = "Mock AI suggestions for preview. Real Bedrock path will run when AWS credentials are configured.";
             } else {
                 badgeMode.className = "badge bg-success";
-                badgeMode.textContent = `AWS Bedrock (${data.model})`;
+                badgeMode.textContent = `${data.model} (${data.region})`;
+                badgeMode.title = `Connected to Amazon Bedrock Runtime in ${data.region}`;
             }
 
             // 1. Populate Titles

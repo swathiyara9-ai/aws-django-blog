@@ -1,4 +1,5 @@
 import json
+from django.conf import settings
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
@@ -43,6 +44,7 @@ def suggest_view(request):
             "success": True,
             "mode": result["mode"],
             "model": result["model"],
+            "region": result.get("region", getattr(settings, "AWS_REGION", "ap-southeast-2")),
             "suggestions": result["suggestions"],
         })
     except AISuggestionError as e:
