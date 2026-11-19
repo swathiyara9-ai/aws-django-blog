@@ -1,9 +1,13 @@
 from io import BytesIO
+from unittest.mock import patch, PropertyMock, MagicMock
 from PIL import Image
-from django.test import TestCase
+from django.conf import settings
+from django.test import TestCase, override_settings
+from django.core.files.storage import StorageHandler, storages, FileSystemStorage
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
+from storages.backends.s3 import S3Storage
 from .models import Post, Tag, Comment, Like
 
 
@@ -242,3 +246,64 @@ class PostCRUDAndAuthTests(TestCase):
         data = response.json()
         self.assertEqual(data.get('status'), 'ok')
         self.assertEqual(data.get('app'), 'aws-django-blog')
+
+
+class MediaStorageConfigurationTests(TestCase):
+    def test_default_local_storage_when_bucket_unset(self):
+        """When AWS_STORAGE_BUCKET_NAME is unset, user media uses local FileSystemStorage."""
+        self.assertIsNone(getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None))
+        default_storage = storages['default']
+        self.assertIsInstance(default_storage, FileSystemStorage)
+        # Static files must remain on WhiteNoise
+        self.assertEqual(
+            settings.STORAGES['staticfiles']['BACKEND'],
+            'whitenoise.storage.CompressedManifestStaticFilesStorage'
+        )
+
+    def test_s3_storage_configuration_when_bucket_set(self):
+        """When AWS_STORAGE_BUCKET_NAME is configured, S3Storage backend is initialized with s3v4 and querystring auth."""
+        s3_storages = {
+            'default': {
+                'BACKEND': 'storages.backends.s3.S3Storage',
+            },
+            'staticfiles': {
+                'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+            },
+        }
+        with override_settings(
+            AWS_STORAGE_BUCKET_NAME='my-production-media-bucket',
+            AWS_S3_REGION_NAME='ap-southeast-2',
+            AWS_S3_SIGNATURE_VERSION='s3v4',
+            AWS_S3_FILE_OVERWRITE=False,
+            AWS_QUERYSTRING_AUTH=True,
+            STORAGES=s3_storages
+        ):
+            handler = StorageHandler()
+            storage = handler['default']
+            self.assertIsInstance(storage, S3Storage)
+            self.assertEqual(storage.bucket_name, 'my-production-media-bucket')
+            self.assertEqual(storage.region_name, 'ap-southeast-2')
+            self.assertEqual(storage.signature_version, 's3v4')
+            self.assertFalse(storage.file_overwrite)
+            self.assertTrue(storage.querystring_auth)
+
+    def test_s3_presigned_url_generation_without_aws_network_call(self):
+        """S3Storage produces signed URLs using client presigning without calling live AWS."""
+        storage = S3Storage(
+            bucket_name='my-production-media-bucket',
+            region_name='ap-southeast-2',
+            signature_version='s3v4',
+            file_overwrite=False,
+            querystring_auth=True
+        )
+        mock_conn = MagicMock()
+        mock_conn.meta.client.generate_presigned_url.return_value = (
+            'https://my-production-media-bucket.s3.ap-southeast-2.amazonaws.com/uploads/photo.jpg'
+            '?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=mockedsig123'
+        )
+        with patch.object(S3Storage, 'connection', new_callable=PropertyMock, return_value=mock_conn):
+            url = storage.url('uploads/photo.jpg')
+            self.assertTrue(url.startswith('https://my-production-media-bucket.s3.ap-southeast-2.amazonaws.com/'))
+            self.assertIn('X-Amz-Signature=mockedsig123', url)
+            mock_conn.meta.client.generate_presigned_url.assert_called_once()
+

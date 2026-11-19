@@ -67,7 +67,8 @@ Done when: network diagram matches `ARCHITECTURE.md`.
 ## Phase 8 — RDS and S3
 - [ ] RDS instance in private subnets
 - [ ] Django connects to RDS (from a test EC2 instance)
-- [ ] S3 media bucket with block public access; django-storages configured
+- [x] django-storages S3 media backend configured (fallback to local media/ when bucket unset, s3v4 signed URLs, no hardcoded keys)
+- [ ] S3 media bucket created with Block Public Access ON (AWS console/Terraform)
 - [ ] IAM role for EC2 (least privilege)
 Done when: posts and images save to RDS and S3 from an EC2 test instance.
 

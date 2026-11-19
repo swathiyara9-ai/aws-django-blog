@@ -161,3 +161,24 @@ After every phase, add an entry. Keep answers in your own words.
 3. Q: What is the purpose of the `/health/` endpoint and how does an AWS ALB use it?
    A: The `/health/` endpoint returns HTTP 200 OK to indicate that the application is alive and ready to process traffic. The AWS Application Load Balancer (ALB) pings this URL periodically (e.g. every 15–30 seconds). If an EC2 instance becomes unresponsive or returns error codes, the ALB stops sending web requests to that instance and signals the Auto Scaling Group to replace it with a healthy instance.
 **Can I honestly put this on my resume?** Yes — Prepared a Django application for cloud deployment following 12-factor principles, configured WhiteNoise static file compression, implemented ALB health-check endpoints, and decoupled environment configurations for AWS RDS and Bedrock.
+
+---
+
+## Phase 8 — S3 media storage (November 19, 2026)
+**What I built:** Configured Django 5.2's modern `STORAGES` dictionary with `django-storages` and `boto3` to offload user-uploaded media files to Amazon S3. Configured secure SigV4 query authentication (`AWS_QUERYSTRING_AUTH = True`) and disabled file overwriting (`AWS_S3_FILE_OVERWRITE = False`). Implemented a zero-credential IAM-role-ready architecture that falls back cleanly to local disk storage (`FileSystemStorage`) when `AWS_STORAGE_BUCKET_NAME` is unset. Added isolated unit tests mocking S3 client and connection properties to guarantee zero live AWS network dependencies.
+**New concepts:**
+- Decoupled Media vs. Static Assets — Static files (CSS/JS) live with application code and are served via WhiteNoise; dynamic media files (user uploads) live in a centralized, durable object store (Amazon S3) independent of EC2 instance lifecycles.
+- Django 5.2 `STORAGES` Setting — The unified configuration dictionary introduced in modern Django that replaces deprecated `DEFAULT_FILE_STORAGE` and `STATICFILES_STORAGE`.
+- IAM Role Instance Profiles vs. Static Access Keys — AWS EC2 instances assume IAM Roles via the Instance Metadata Service (IMDS). `boto3` and `django-storages` retrieve temporary credentials automatically, eliminating hard-coded secrets or `.env` credentials in production.
+- S3 Presigned URLs (`AWS_QUERYSTRING_AUTH = True`) & SigV4 — Keeping the S3 bucket private with Block Public Access ON while generating cryptographically signed, expiring URLs (`s3v4`) so authorized readers can view uploaded photos securely.
+**Problems faced and fixes:**
+- Ensuring local development and unit tests continue without an AWS account: wrapped `STORAGES["default"]` configuration in an `if AWS_STORAGE_BUCKET_NAME:` check so the application defaults to local `FileSystemStorage` on developer workstations and switches to S3 automatically when deployed to AWS.
+**Likely questions and my answers:**
+1. Q: Why can't we store user-uploaded images on the EC2 instance's local filesystem in production?
+   A: In an Auto Scaling architecture with multiple EC2 instances behind an Application Load Balancer, an image uploaded to one instance would not exist on other instances. Furthermore, EC2 instances are ephemeral: when traffic drops or an instance fails health checks, Auto Scaling terminates it, destroying any local files. Amazon S3 provides centralized, 99.999999999% (11 9s) durable object storage accessible by all instances.
+2. Q: Why use IAM Roles instead of storing AWS access keys in environment variables on EC2?
+   A: Hardcoded access keys or environment variables can be accidentally leaked, committed to Git, or left on disk. IAM Roles use the EC2 Instance Metadata Service to issue short-lived, automatically rotated temporary credentials. No permanent AWS credentials ever exist on the virtual machine.
+3. Q: How does the app display images if the S3 bucket blocks all public access?
+   A: With `AWS_QUERYSTRING_AUTH = True`, Django and boto3 sign each media URL using the AWS Signature Version 4 algorithm (`s3v4`), adding an expiration timestamp and cryptographic signature to the query string. The browser fetches the image directly from S3 using the temporary signature, keeping the bucket entirely closed to public anonymous reads.
+**Can I honestly put this on my resume?** Yes — Implemented cloud-native media storage in Django 5.2 using `django-storages` and Amazon S3 with IAM instance profile authentication, SigV4 signed URLs, and local filesystem fallback.
+
