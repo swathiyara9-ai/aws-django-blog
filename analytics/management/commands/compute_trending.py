@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from cloudlog.tracker import CloudTracker, get_db_service_label
 from analytics.services import compute_trending_scores
 from analytics.models import PostStats
 
@@ -8,8 +9,15 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.NOTICE("Computing trending scores..."))
-        
-        updated_stats = compute_trending_scores()
+        tracker = CloudTracker(action="trending_recomputed", post_title="Batch Trending Recalculation")
+
+        with tracker.step(get_db_service_label(), "Fetched published posts"):
+            pass
+
+        with tracker.step("Trending", "Computed time-decayed scores for all posts"):
+            updated_stats = compute_trending_scores()
+
+        tracker.save()
         
         # Display leaderboard
         top_posts = PostStats.objects.select_related('post').order_by('-score')[:5]

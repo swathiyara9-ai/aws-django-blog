@@ -19,6 +19,7 @@ def health_check(request):
 urlpatterns = [
     path('health/', health_check, name='health_check'),
     path('admin/', admin.site.urls),
+    path('api/', include('cloudlog.urls')),
     path('ai/', include('ai_assist.urls')),
     path('', include('blog.urls')),
     # Serve user-uploaded media files locally (works under both DEBUG=True and DEBUG=False).

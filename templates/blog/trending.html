@@ -1,0 +1,326 @@
+{% extends 'base.html' %}
+
+{% block title %}Trending Analytics &middot; AWS Django Blog{% endblock %}
+
+{% block content %}
+<div class="trending-container mx-auto" style="max-width: 1100px;">
+    <!-- Page Header & Formula Banner -->
+    <div class="mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <div>
+                <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+                    <i class="bi bi-fire text-danger"></i> Trending Leaderboard
+                </h1>
+                <p class="text-muted small mb-0">Live post rankings updated continuously based on reader engagement and polynomial time decay.</p>
+            </div>
+            <div class="d-flex align-items-center gap-2 text-muted small">
+                <span class="spinner-grow spinner-grow-sm text-danger" style="width: 0.5rem; height: 0.5rem;" role="status"></span>
+                <span>Auto-refreshes every 15s</span>
+            </div>
+        </div>
+
+        <!-- Formula Explanation Callout -->
+        <div class="alert alert-light border shadow-sm rounded-4 p-3 mb-4">
+            <div class="d-flex align-items-start gap-2">
+                <i class="bi bi-calculator-fill text-primary mt-1 fs-5"></i>
+                <div class="small">
+                    <strong>Ranking Formula:</strong> 
+                    <code>Score = (Views + 3 &times; Comments + 2 &times; Likes) / (Age in Hours + 2)<sup>1.5</sup></code>
+                    <div class="text-secondary mt-1">
+                        Weighted engagement prioritizes genuine community discussions (comments &times;3, likes &times;2) while time decay (power 1.5) ensures fresh ideas regularly rotate into the top rankings.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top 3 Hero Row -->
+    <div class="mb-5">
+        <h2 class="h5 fw-bold mb-3 text-secondary text-uppercase tracking-wider" style="letter-spacing: 0.05em; font-size: 0.85rem;">
+            Top 3 High Momentum Posts
+        </h2>
+        <div class="row g-4" id="hero-trending-row">
+            {% if hero_trending %}
+                {% for item in hero_trending %}
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 rounded-4 shadow-sm overflow-hidden hero-card position-relative" style="background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--border);">
+                            <div class="p-4 d-flex flex-column h-100">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <span class="badge {% if item.rank == 1 %}bg-warning text-dark{% elif item.rank == 2 %}bg-secondary text-white{% else %}bg-danger text-white{% endif %} rounded-pill px-3 py-1.5 fs-6 shadow-sm d-inline-flex align-items-center gap-1">
+                                        <i class="bi bi-fire"></i> #{{ item.rank }}
+                                    </span>
+                                    <!-- Rank change indicator -->
+                                    <span class="rank-change-badge small">
+                                        {% if item.rank_change and item.rank_change > 0 %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                                <i class="bi bi-arrow-up"></i> +{{ item.rank_change }}
+                                            </span>
+                                        {% elif item.rank_change and item.rank_change < 0 %}
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                                <i class="bi bi-arrow-down"></i> {{ item.rank_change }}
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-light text-muted border">&mdash; steady</span>
+                                        {% endif %}
+                                    </span>
+                                </div>
+
+                                <h3 class="h5 fw-bold mb-2">
+                                    <a href="{% url 'post_detail' slug=item.slug %}" class="text-dark text-decoration-none hover-primary">
+                                        {{ item.title }}
+                                    </a>
+                                </h3>
+
+                                <div class="text-muted small mb-3">
+                                    By <strong>{{ item.author }}</strong> &middot; {{ item.age_hours }}h ago
+                                </div>
+
+                                <div class="mt-auto">
+                                    <!-- Score Display -->
+                                    <div class="d-flex justify-content-between align-items-center mb-1 small">
+                                        <span class="fw-semibold text-secondary">Trending Score</span>
+                                        <span class="fw-bold text-primary fs-6">{{ item.score|floatformat:2 }}</span>
+                                    </div>
+
+                                    <!-- Score Breakdown Bar -->
+                                    <div class="progress rounded-pill mb-2" style="height: 8px;">
+                                        <div class="progress-bar bg-info" style="width: 35%;" title="Views: {{ item.views }}"></div>
+                                        <div class="progress-bar bg-success" style="width: 45%;" title="Comments: {{ item.comments }} (x3)"></div>
+                                        <div class="progress-bar bg-danger" style="width: 20%;" title="Likes: {{ item.likes }} (x2)"></div>
+                                    </div>
+
+                                    <!-- Engagement Stats Breakdown -->
+                                    <div class="d-flex justify-content-between small text-muted pt-2 border-top border-light-subtle">
+                                        <span title="Views"><i class="bi bi-eye text-info"></i> {{ item.views }}</span>
+                                        <span title="Comments"><i class="bi bi-chat-text text-success"></i> {{ item.comments }}</span>
+                                        <span title="Likes"><i class="bi bi-heart text-danger"></i> {{ item.likes }}</span>
+                                        <span title="Age"><i class="bi bi-clock text-secondary"></i> {{ item.age_hours }}h</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-12 text-center py-4 text-muted">
+                    No trending data recorded yet. Browse and interact with posts to kickstart the leaderboard!
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Ranks 4 to 10 Table / List -->
+    <div class="card border-0 rounded-4 shadow-sm p-4 bg-white">
+        <h2 class="h5 fw-bold mb-3 text-secondary text-uppercase tracking-wider" style="letter-spacing: 0.05em; font-size: 0.85rem;">
+            Ranks 4 &ndash; 10 Leaderboard
+        </h2>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="trending-table">
+                <thead class="table-light small text-secondary">
+                    <tr>
+                        <th style="width: 70px;">Rank</th>
+                        <th>Article</th>
+                        <th style="width: 140px;">Author</th>
+                        <th style="width: 180px;">Engagement Breakdown</th>
+                        <th style="width: 100px;" class="text-end">Score</th>
+                        <th style="width: 90px;" class="text-center">Trend</th>
+                    </tr>
+                </thead>
+                <tbody id="trending-table-body">
+                    {% if rest_trending %}
+                        {% for item in rest_trending %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill px-2.5 py-1 fw-bold">
+                                        #{{ item.rank }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{% url 'post_detail' slug=item.slug %}" class="fw-semibold text-dark text-decoration-none hover-primary">
+                                        {{ item.title }}
+                                    </a>
+                                </td>
+                                <td class="small text-muted">
+                                    <i class="bi bi-person-circle me-1"></i>{{ item.author }}
+                                </td>
+                                <td>
+                                    <div class="small d-flex gap-2 text-muted mb-1">
+                                        <span><i class="bi bi-eye text-info"></i> {{ item.views }}</span>
+                                        <span><i class="bi bi-chat-text text-success"></i> {{ item.comments }}</span>
+                                        <span><i class="bi bi-heart text-danger"></i> {{ item.likes }}</span>
+                                        <span><i class="bi bi-clock"></i> {{ item.age_hours }}h</span>
+                                    </div>
+                                    <div class="progress rounded-pill" style="height: 6px;">
+                                        <div class="progress-bar bg-info" style="width: 35%;"></div>
+                                        <div class="progress-bar bg-success" style="width: 45%;"></div>
+                                        <div class="progress-bar bg-danger" style="width: 20%;"></div>
+                                    </div>
+                                </td>
+                                <td class="text-end fw-bold text-primary">
+                                    {{ item.score|floatformat:2 }}
+                                </td>
+                                <td class="text-center small">
+                                    {% if item.rank_change and item.rank_change > 0 %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                            <i class="bi bi-arrow-up"></i> +{{ item.rank_change }}
+                                        </span>
+                                    {% elif item.rank_change and item.rank_change < 0 %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                            <i class="bi bi-arrow-down"></i> {{ item.rank_change }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-light text-muted border">&mdash;</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-3">
+                                No additional posts ranked at this time.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function refreshTrending() {
+        fetch('/api/trending/')
+            .then(res => res.json())
+            .then(data => {
+                if (!data || !data.trending) return;
+                const trending = data.trending;
+                const heroItems = trending.slice(0, 3);
+                const restItems = trending.slice(3, 10);
+
+                // Update Hero Row
+                const heroRow = document.getElementById('hero-trending-row');
+                if (heroRow && heroItems.length > 0) {
+                    heroRow.innerHTML = heroItems.map(item => {
+                        const rankClass = item.rank === 1 ? 'bg-warning text-dark' : (item.rank === 2 ? 'bg-secondary text-white' : 'bg-danger text-white');
+                        let changeHtml = '<span class="badge bg-light text-muted border">&mdash; steady</span>';
+                        if (item.rank_change > 0) {
+                            changeHtml = `<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-arrow-up"></i> +${item.rank_change}</span>`;
+                        } else if (item.rank_change < 0) {
+                            changeHtml = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle"><i class="bi bi-arrow-down"></i> ${item.rank_change}</span>`;
+                        }
+
+                        const totalWeight = (item.views + (item.comments * 3) + (item.likes * 2)) || 1;
+                        const vPct = Math.round((item.views / totalWeight) * 100);
+                        const cPct = Math.round(((item.comments * 3) / totalWeight) * 100);
+                        const lPct = Math.round(((item.likes * 2) / totalWeight) * 100);
+
+                        return `
+                            <div class="col-md-4">
+                                <div class="card h-100 border-0 rounded-4 shadow-sm overflow-hidden hero-card position-relative" style="background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--border);">
+                                    <div class="p-4 d-flex flex-column h-100">
+                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                            <span class="badge ${rankClass} rounded-pill px-3 py-1.5 fs-6 shadow-sm d-inline-flex align-items-center gap-1">
+                                                <i class="bi bi-fire"></i> #${item.rank}
+                                            </span>
+                                            <span class="rank-change-badge small">${changeHtml}</span>
+                                        </div>
+                                        <h3 class="h5 fw-bold mb-2">
+                                            <a href="/post/${item.slug}/" class="text-dark text-decoration-none hover-primary">
+                                                ${item.title}
+                                            </a>
+                                        </h3>
+                                        <div class="text-muted small mb-3">
+                                            By <strong>${item.author}</strong> &middot; ${item.age_hours}h ago
+                                        </div>
+                                        <div class="mt-auto">
+                                            <div class="d-flex justify-content-between align-items-center mb-1 small">
+                                                <span class="fw-semibold text-secondary">Trending Score</span>
+                                                <span class="fw-bold text-primary fs-6">${Number(item.score).toFixed(2)}</span>
+                                            </div>
+                                            <div class="progress rounded-pill mb-2" style="height: 8px;">
+                                                <div class="progress-bar bg-info" style="width: ${vPct}%;"></div>
+                                                <div class="progress-bar bg-success" style="width: ${cPct}%;"></div>
+                                                <div class="progress-bar bg-danger" style="width: ${lPct}%;"></div>
+                                            </div>
+                                            <div class="d-flex justify-content-between small text-muted pt-2 border-top border-light-subtle">
+                                                <span title="Views"><i class="bi bi-eye text-info"></i> ${item.views}</span>
+                                                <span title="Comments"><i class="bi bi-chat-text text-success"></i> ${item.comments}</span>
+                                                <span title="Likes"><i class="bi bi-heart text-danger"></i> ${item.likes}</span>
+                                                <span title="Age"><i class="bi bi-clock text-secondary"></i> ${item.age_hours}h</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                // Update Table Body
+                const tableBody = document.getElementById('trending-table-body');
+                if (tableBody) {
+                    if (restItems.length > 0) {
+                        tableBody.innerHTML = restItems.map(item => {
+                            let changeHtml = '<span class="badge bg-light text-muted border">&mdash;</span>';
+                            if (item.rank_change > 0) {
+                                changeHtml = `<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-arrow-up"></i> +${item.rank_change}</span>`;
+                            } else if (item.rank_change < 0) {
+                                changeHtml = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle"><i class="bi bi-arrow-down"></i> ${item.rank_change}</span>`;
+                            }
+
+                            const totalWeight = (item.views + (item.comments * 3) + (item.likes * 2)) || 1;
+                            const vPct = Math.round((item.views / totalWeight) * 100);
+                            const cPct = Math.round(((item.comments * 3) / totalWeight) * 100);
+                            const lPct = Math.round(((item.likes * 2) / totalWeight) * 100);
+
+                            return `
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill px-2.5 py-1 fw-bold">
+                                            #${item.rank}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="/post/${item.slug}/" class="fw-semibold text-dark text-decoration-none hover-primary">
+                                            ${item.title}
+                                        </a>
+                                    </td>
+                                    <td class="small text-muted">
+                                        <i class="bi bi-person-circle me-1"></i>${item.author}
+                                    </td>
+                                    <td>
+                                        <div class="small d-flex gap-2 text-muted mb-1">
+                                            <span><i class="bi bi-eye text-info"></i> ${item.views}</span>
+                                            <span><i class="bi bi-chat-text text-success"></i> ${item.comments}</span>
+                                            <span><i class="bi bi-heart text-danger"></i> ${item.likes}</span>
+                                            <span><i class="bi bi-clock"></i> ${item.age_hours}h</span>
+                                        </div>
+                                        <div class="progress rounded-pill" style="height: 6px;">
+                                            <div class="progress-bar bg-info" style="width: ${vPct}%;"></div>
+                                            <div class="progress-bar bg-success" style="width: ${cPct}%;"></div>
+                                            <div class="progress-bar bg-danger" style="width: ${lPct}%;"></div>
+                                        </div>
+                                    </td>
+                                    <td class="text-end fw-bold text-primary">
+                                        ${Number(item.score).toFixed(2)}
+                                    </td>
+                                    <td class="text-center small">
+                                        ${changeHtml}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('');
+                    } else {
+                        tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">No additional posts ranked at this time.</td></tr>`;
+                    }
+                }
+            })
+            .catch(err => console.error('Error refreshing trending:', err));
+    }
+
+    // Auto-refresh every 15 seconds
+    setInterval(refreshTrending, 15000);
+});
+</script>
+{% endblock %}

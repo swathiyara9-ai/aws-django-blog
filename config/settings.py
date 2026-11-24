@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'blog',
     'analytics',
     'ai_assist',
+    'cloudlog',
 ]
 
 MIDDLEWARE = [
@@ -169,6 +170,15 @@ if AWS_STORAGE_BUCKET_NAME:
     STORAGES = {
         "default": {
             "BACKEND": "storages.backends.s3.S3Storage",
+            "OPTIONS": {
+                "bucket_name": AWS_STORAGE_BUCKET_NAME,
+                "region_name": AWS_S3_REGION_NAME,
+                "endpoint_url": f"https://s3.{AWS_S3_REGION_NAME}.amazonaws.com",
+                "addressing_style": "virtual",
+                "signature_version": "s3v4",
+                "file_overwrite": False,
+                "querystring_auth": True,
+            },
         },
         "staticfiles": {
             "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",

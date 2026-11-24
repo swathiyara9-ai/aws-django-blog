@@ -3,148 +3,271 @@
 {% block title %}{{ post.title }} &middot; AWS Django Blog{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-lg-8 mx-auto">
-        <article class="card shadow-sm border-0 mb-4">
-            <div class="card-body p-4 p-md-5">
-                <!-- Draft Status Warning Banner -->
-                {% if post.status == 'draft' %}
-                    <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
-                        <strong>Draft Preview:</strong>&nbsp;This post is unpublished and visible only to you.
+<style>
+    /* Two-Column Detail Layout: Desktop 55% / 45%, Stacked on Mobile */
+    .post-detail-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+
+    @media (min-width: 992px) {
+        .post-detail-layout {
+            flex-direction: row;
+            align-items: flex-start;
+        }
+        .post-detail-media-col {
+            flex: 0 0 55%;
+            max-width: 55%;
+            position: sticky;
+            top: 75px;
+        }
+        .post-detail-content-col {
+            flex: 0 0 calc(45% - 2rem);
+            max-width: calc(45% - 2rem);
+        }
+    }
+
+    .media-card-container {
+        background-color: rgba(0, 0, 0, 0.03);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 1.25rem;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 320px;
+        max-height: 80vh;
+    }
+
+    .post-detail-img {
+        max-height: 80vh;
+        width: 100%;
+        object-fit: contain;
+        cursor: zoom-in;
+        transition: transform 0.2s ease;
+    }
+
+    .post-detail-img:hover {
+        transform: scale(1.01);
+    }
+
+    .lightbox-modal-img {
+        max-height: 90vh;
+        max-width: 95vw;
+        object-fit: contain;
+    }
+
+    .post-color-hero {
+        min-height: 360px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 2.5rem 1.5rem;
+        border-radius: 1.25rem;
+        background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
+    }
+
+    .hashtag-chip {
+        font-size: 0.8rem;
+        transition: background-color 0.15s ease, transform 0.15s ease;
+    }
+    .hashtag-chip:hover {
+        transform: translateY(-1px);
+    }
+</style>
+
+<div class="post-detail-wrapper mx-auto" style="max-width: 1350px;">
+    <!-- 6. Back Button Navigation (At top-left above the card, works with browser history) -->
+    <div class="mb-3">
+        <a href="{% url 'post_list' %}" id="back-nav-btn" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-inline-flex align-items-center gap-1.5 shadow-sm">
+            <i class="bi bi-arrow-left"></i> Back to all posts
+        </a>
+    </div>
+
+    <!-- Draft Status Banner if applicable -->
+    {% if post.status == 'draft' %}
+        <div class="alert alert-warning border border-warning-subtle d-flex align-items-center rounded-4 mb-4 shadow-sm" role="alert">
+            <i class="bi bi-eye-slash-fill me-2 fs-5"></i>
+            <div><strong>Draft Preview:</strong> This post is unpublished and visible only to you.</div>
+        </div>
+    {% endif %}
+
+    <!-- 5. Two-Column Layout (LEFT ~55% Sticky, RIGHT ~45% Scrolling) -->
+    <div class="post-detail-layout">
+        <!-- LEFT COLUMN (~55%): Media / Image / Lightbox / Sticky -->
+        <div class="post-detail-media-col">
+            {% if post.image %}
+                <div class="media-card-container shadow-sm position-relative">
+                    <img src="{{ post.image.url }}" 
+                         alt="{{ post.image_alt|default:post.title }}" 
+                         class="post-detail-img" 
+                         loading="eager" 
+                         decoding="async"
+                         data-bs-toggle="modal" 
+                         data-bs-target="#imageLightboxModal"
+                         title="Click to zoom image">
+                    
+                    <button type="button" class="btn btn-dark btn-sm rounded-circle position-absolute bottom-0 end-0 m-3 shadow" data-bs-toggle="modal" data-bs-target="#imageLightboxModal" title="Open Fullscreen Lightbox">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                    </button>
+                </div>
+            {% else %}
+                <!-- Color Block for Posts Without an Image -->
+                <div class="post-color-hero shadow-sm text-white">
+                    <div class="p-4">
+                        <i class="bi bi-journal-text display-3 mb-3 d-block opacity-75"></i>
+                        <h2 class="h3 fw-bold text-white mb-0">{{ post.title }}</h2>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- RIGHT COLUMN (~45%): Ordered content -->
+        <div class="post-detail-content-col">
+            <div class="card border-0 rounded-4 shadow-sm p-4 p-md-4 bg-white">
+                <!-- 1. Title -->
+                <h1 class="h3 fw-bold mb-2 text-dark">{{ post.title }}</h1>
+
+                <!-- 2. Author (username) and date (and "edited <date>" if updated) -->
+                <div class="text-muted small mb-3 pb-2 border-bottom">
+                    By <strong>{{ post.author.username }}</strong> &middot; {{ post.created_at|date:"F j, Y, g:i a" }}
+                    {% if post.updated_at|date:"YmdHi" != post.created_at|date:"YmdHi" %}
+                        <span class="text-secondary fst-italic ms-1">(edited {{ post.updated_at|date:"M j, Y" }})</span>
+                    {% endif %}
+                </div>
+
+                <!-- 3. Basic details row (views, likes, comments, reading time, status) -->
+                <div class="d-flex flex-wrap align-items-center gap-2 p-2.5 rounded-3 bg-light border text-muted small mb-3">
+                    <span title="Total Views"><i class="bi bi-eye text-info me-1"></i>{{ views_count }} view{{ views_count|pluralize }}</span>
+                    <span class="text-secondary">&vert;</span>
+                    <span title="Likes"><i class="bi bi-heart text-danger me-1"></i>{{ likes_count }} like{{ likes_count|pluralize }}</span>
+                    <span class="text-secondary">&vert;</span>
+                    <span title="Comments"><i class="bi bi-chat-text text-success me-1"></i>{{ comments.count }} comment{{ comments.count|pluralize }}</span>
+                    <span class="text-secondary">&vert;</span>
+                    <span title="Estimated Reading Time"><i class="bi bi-clock me-1"></i>{{ reading_time }} min read</span>
+                    <span class="text-secondary">&vert;</span>
+                    <span class="badge {% if post.status == 'published' %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% endif %}">
+                        {{ post.get_status_display }}
+                    </span>
+                </div>
+
+                <!-- 4. Hashtags as chips (clickable, link to tag page) -->
+                {% if post.tags.exists %}
+                    <div class="mb-3 d-flex flex-wrap gap-1.5">
+                        {% for tag in post.tags.all %}
+                            <a href="{% url 'tag_posts' tag_name=tag.name %}" class="badge bg-secondary-subtle text-secondary-emphasis text-decoration-none px-2.5 py-1.5 rounded-pill hashtag-chip">
+                                #{{ tag.name }}
+                            </a>
+                        {% endfor %}
                     </div>
                 {% endif %}
 
-                <!-- Cover Image (Phase 3) -->
-                {% if post.image %}
-                    <div class="mb-4 text-center">
-                        <img src="{{ post.image.url }}" 
-                             alt="{{ post.image_alt|default:post.title }}" 
-                             class="img-fluid rounded shadow-sm w-100" 
-                             style="max-height: 420px; object-fit: cover;">
+                <!-- Post Summary (if available) -->
+                {% if post.summary %}
+                    <div class="alert alert-light border small text-secondary mb-3 fst-italic">
+                        <strong class="d-block text-dark mb-1 not-italic">Summary:</strong>
+                        {{ post.summary }}
                     </div>
                 {% endif %}
 
-                <!-- Post Title & Meta -->
-                <h1 class="display-6 fw-bold mb-3">{{ post.title }}</h1>
-                <div class="text-muted small mb-4 pb-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <!-- 5. Post body -->
+                <div class="post-body text-dark lh-lg mb-4" style="white-space: pre-line; font-size: 1.02rem;">
+                    {{ post.body }}
+                </div>
+
+                <!-- 6. Like button, and for the author only, Edit and Delete buttons -->
+                <div class="d-flex justify-content-between align-items-center gap-2 pt-3 border-top mb-4">
+                    <!-- Like button -->
                     <div>
-                        By <strong>{{ post.author.username }}</strong> &middot; {{ post.created_at|date:"F j, Y, g:i a" }}
-                        {% if post.updated_at != post.created_at %}
-                            <span class="fst-italic">(edited {{ post.updated_at|date:"M j, Y" }})</span>
+                        {% if user.is_authenticated %}
+                            <form method="post" action="{% url 'post_like_toggle' slug=post.slug %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm {% if user_has_liked %}btn-danger{% else %}btn-outline-danger{% endif %} rounded-pill px-3 shadow-sm">
+                                    <i class="bi bi-heart{% if user_has_liked %}-fill{% endif %} me-1"></i>
+                                    {% if user_has_liked %}Liked{% else %}Like{% endif %} ({{ likes_count }})
+                                </button>
+                            </form>
+                        {% else %}
+                            <a href="{% url 'login' %}?next={{ request.path }}" class="btn btn-sm btn-outline-danger rounded-pill px-3 shadow-sm">
+                                <i class="bi bi-heart me-1"></i> Like ({{ likes_count }})
+                            </a>
                         {% endif %}
-                        &middot; <span class="text-secondary" title="Total views">&#128065; {{ views_count }} view{{ views_count|pluralize }}</span>
                     </div>
 
                     <!-- Author Action Buttons -->
                     {% if user.is_authenticated and user == post.author %}
                         <div class="btn-group btn-group-sm">
-                            <a href="{% url 'post_update' slug=post.slug %}" class="btn btn-outline-secondary">Edit Post</a>
-                            <a href="{% url 'post_delete' slug=post.slug %}" class="btn btn-outline-danger">Delete</a>
+                            <a href="{% url 'post_update' slug=post.slug %}" class="btn btn-outline-secondary rounded-start-pill px-3">
+                                <i class="bi bi-pencil me-1"></i> Edit
+                            </a>
+                            <a href="{% url 'post_delete' slug=post.slug %}" class="btn btn-outline-danger rounded-end-pill px-3">
+                                <i class="bi bi-trash me-1"></i> Delete
+                            </a>
                         </div>
                     {% endif %}
                 </div>
 
-                <!-- Post Summary (if available) -->
-                {% if post.summary %}
-                    <p class="lead text-secondary mb-4 fst-italic bg-light p-3 rounded">
-                        {{ post.summary }}
-                    </p>
-                {% endif %}
-
-                <!-- Post Body -->
-                <div class="fs-5 lh-lg mb-4 text-dark" style="white-space: pre-line;">
-                    {{ post.body }}
-                </div>
-
-                <!-- Tags & Like Section (Phase 3) -->
-                <div class="pt-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <!-- Tags -->
-                    <div>
-                        {% if post.tags.exists %}
-                            <span class="text-muted small me-2">Tags:</span>
-                            {% for tag in post.tags.all %}
-                                <a href="{% url 'tag_posts' tag_name=tag.name %}" class="badge bg-secondary-subtle text-secondary-emphasis text-decoration-none me-1">
-                                    {{ tag }}
-                                </a>
+                <!-- 7. Comments list (newest first) -->
+                <div class="comments-section mb-4">
+                    <h3 class="h5 fw-bold mb-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-chat-left-text text-primary"></i> Comments ({{ comments.count }})
+                    </h3>
+                    {% if comments %}
+                        <div class="vstack gap-2.5 mb-3">
+                            {% for comment in comments %}
+                                <div class="p-3 rounded-3 bg-light border">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold small text-dark"><i class="bi bi-person-circle text-secondary me-1"></i>{{ comment.author.username }}</span>
+                                        <span class="text-muted" style="font-size: 0.75rem;">{{ comment.created_at|date:"M j, Y, g:i a" }}</span>
+                                    </div>
+                                    <p class="mb-0 text-secondary small" style="white-space: pre-line;">{{ comment.body }}</p>
+                                </div>
                             {% endfor %}
-                        {% endif %}
-                    </div>
-
-                    <!-- Like / Unlike Button -->
-                    <div>
-                        {% if user.is_authenticated %}
-                            <form method="post" action="{% url 'post_like_toggle' slug=post.slug %}" class="d-inline">
-                                {% csrf_token %}
-                                {% if user_has_liked %}
-                                    <button type="submit" class="btn btn-danger btn-sm">
-                                        &hearts; Liked ({{ likes_count }})
-                                    </button>
-                                {% else %}
-                                    <button type="submit" class="btn btn-outline-danger btn-sm">
-                                        &hearts; Like ({{ likes_count }})
-                                    </button>
-                                {% endif %}
-                            </form>
-                        {% else %}
-                            <a href="{% url 'login' %}?next={{ request.path }}" class="btn btn-outline-danger btn-sm" title="Log in to like">
-                                &hearts; Like ({{ likes_count }})
-                            </a>
-                        {% endif %}
-                    </div>
+                        </div>
+                    {% else %}
+                        <p class="text-muted small fst-italic mb-3">No comments yet. Be the first to share your perspective!</p>
+                    {% endif %}
                 </div>
-            </div>
-        </article>
 
-        <!-- Comments Section (Phase 3) -->
-        <section class="card shadow-sm border-0 mb-4">
-            <div class="card-body p-4 p-md-5">
-                <h3 class="h4 fw-bold mb-4">
-                    Comments ({{ comments.count }})
-                </h3>
-
-                <!-- Add Comment Form -->
-                {% if user.is_authenticated %}
-                    <div class="mb-4 p-3 bg-light rounded border">
-                        <h5 class="h6 fw-bold mb-3">Leave a Comment</h5>
+                <!-- 8. Comment form -->
+                <div class="comment-form-box p-3 rounded-3 bg-light border">
+                    <h4 class="h6 fw-bold mb-2 text-dark">Leave a Comment</h4>
+                    {% if user.is_authenticated %}
                         <form method="post" action="{% url 'post_comment' slug=post.slug %}">
                             {% csrf_token %}
-                            <div class="mb-3">
+                            <div class="mb-2">
                                 {{ comment_form.body }}
                             </div>
-                            <button type="submit" class="btn btn-primary btn-sm px-3">Post Comment</button>
+                            <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3">
+                                <i class="bi bi-send me-1"></i> Post Comment
+                            </button>
                         </form>
-                    </div>
-                {% else %}
-                    <div class="alert alert-light border mb-4 text-center">
-                        <p class="mb-0 text-muted">
-                            <a href="{% url 'login' %}?next={{ request.path }}" class="fw-semibold">Log in</a> to leave a comment.
-                        </p>
-                    </div>
-                {% endif %}
-
-                <!-- Comments List -->
-                {% if comments %}
-                    <div class="vstack gap-3">
-                        {% for comment in comments %}
-                            <div class="p-3 border-bottom">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="fw-bold">{{ comment.author.username }}</span>
-                                    <span class="text-muted small">{{ comment.created_at|date:"M j, Y, g:i a" }}</span>
-                                </div>
-                                <p class="mb-0 text-secondary" style="white-space: pre-line;">{{ comment.body }}</p>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="text-muted fst-italic mb-0">No comments yet. Be the first to share your thoughts!</p>
-                {% endif %}
+                    {% else %}
+                        <div class="small text-muted">
+                            <a href="{% url 'login' %}?next={{ request.path }}" class="fw-semibold text-decoration-none">Log in</a> to join the discussion.
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-        </section>
-
-        <!-- Back to feed navigation -->
-        <div class="mb-5">
-            <a href="{% url 'post_list' %}" class="text-decoration-none">&larr; Back to all posts</a>
         </div>
     </div>
 </div>
+
+<!-- Image Lightbox Modal (Phase 8 Polish) -->
+{% if post.image %}
+<div class="modal fade" id="imageLightboxModal" tabindex="-1" aria-labelledby="imageLightboxModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0 text-center position-relative">
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3 z-3 bg-dark p-2 rounded-circle" data-bs-dismiss="modal" aria-label="Close"></button>
+                <img src="{{ post.image.url }}" alt="{{ post.image_alt|default:post.title }}" class="lightbox-modal-img rounded-3 shadow-lg">
+                <div class="text-white small mt-2 opacity-75">{{ post.title }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

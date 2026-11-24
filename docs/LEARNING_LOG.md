@@ -173,6 +173,7 @@ After every phase, add an entry. Keep answers in your own words.
 - S3 Presigned URLs (`AWS_QUERYSTRING_AUTH = True`) & SigV4 — Keeping the S3 bucket private with Block Public Access ON while generating cryptographically signed, expiring URLs (`s3v4`) so authorized readers can view uploaded photos securely.
 **Problems faced and fixes:**
 - Ensuring local development and unit tests continue without an AWS account: wrapped `STORAGES["default"]` configuration in an `if AWS_STORAGE_BUCKET_NAME:` check so the application defaults to local `FileSystemStorage` on developer workstations and switches to S3 automatically when deployed to AWS.
+- Presigned S3 image URLs returned HTTP 400 Bad Request in `ap-southeast-2` because `django-storages` generated the global endpoint hostname (`<bucket>.s3.amazonaws.com`): AWS SigV4 requires the host header to match the signing region. Fixed by explicitly configuring `endpoint_url=f"https://s3.{AWS_S3_REGION_NAME}.amazonaws.com"` and `addressing_style="virtual"` inside `STORAGES["default"]["OPTIONS"]`.
 **Likely questions and my answers:**
 1. Q: Why can't we store user-uploaded images on the EC2 instance's local filesystem in production?
    A: In an Auto Scaling architecture with multiple EC2 instances behind an Application Load Balancer, an image uploaded to one instance would not exist on other instances. Furthermore, EC2 instances are ephemeral: when traffic drops or an instance fails health checks, Auto Scaling terminates it, destroying any local files. Amazon S3 provides centralized, 99.999999999% (11 9s) durable object storage accessible by all instances.
@@ -181,4 +182,101 @@ After every phase, add an entry. Keep answers in your own words.
 3. Q: How does the app display images if the S3 bucket blocks all public access?
    A: With `AWS_QUERYSTRING_AUTH = True`, Django and boto3 sign each media URL using the AWS Signature Version 4 algorithm (`s3v4`), adding an expiration timestamp and cryptographic signature to the query string. The browser fetches the image directly from S3 using the temporary signature, keeping the bucket entirely closed to public anonymous reads.
 **Can I honestly put this on my resume?** Yes — Implemented cloud-native media storage in Django 5.2 using `django-storages` and Amazon S3 with IAM instance profile authentication, SigV4 signed URLs, and local filesystem fallback.
+
+---
+
+## Phase 8.1 — Cloud Activity Telemetry & Performance Optimization (November 21, 2026)
+**What I built:** Created the `cloudlog` telemetry app to truthfully track and display what cloud services execute behind every action. Implemented `CloudTracker` context manager measuring real operational latencies with `time.perf_counter()`. Instrumented post CRUD, S3 upload sizes, comments, likes, deduplicated views, and AI assist invocations. Added real-time single-post trending recalculation with a 30-second invalidating cache. Created 4 public JSON API endpoints (`/api/cloud-activity/`, `/api/trending/`, `/api/cloud-status/` with IMDSv2 local fallback, and `/api/ai-insights/`). Optimized post list views with `select_related`, `prefetch_related`, and aggregation annotations, bringing N+1 queries down to 5 constant queries.
+**New concepts:**
+- Cloud Observability & Telemetry — Instrumenting application code to capture granular sub-operation execution times (Django/Gunicorn, RDS/SQLite, S3, Bedrock/Mock AI) without adding external monitoring overhead.
+- EC2 Instance Metadata Service (IMDSv2) — A link-local HTTP service (`http://169.254.169.254/latest/api/token`) used by software on EC2 to securely inspect its Availability Zone, Region, and Instance ID using session-oriented token requests to protect against SSRF vulnerabilities.
+- N+1 Query Problem & Solutions — Recognizing that looping over models to access foreign keys or related counts triggers individual database queries (N queries for N items). Resolved using SQL `JOIN`s via `select_related()`, multi-table prefetching via `prefetch_related()`, and SQL aggregation `Count()` annotations.
+- Cache Invalidation Strategies — Storing frequently computed leaderboard aggregations (e.g. top 10 trending) in a short-lived cache (30s TTL) while actively purging it (`cache.delete()`) whenever an underlying score event occurs (new view, comment, or like).
+**Problems faced and fixes:**
+- `PostListView` executed 15 queries on a 5-post page because the template called `post.likes.count` and `post.comments.count` for every post: updated `PostListView.get_queryset()` to annotate `likes_count` and `comments_count` directly in SQL and updated templates to reference the annotated values, achieving 5 constant queries.
+**Likely questions and my answers:**
+1. Q: What is the N+1 query problem, and how did you diagnose and eliminate it?
+   A: The N+1 query problem occurs when fetching a list of items requires 1 query for the parent records and N additional queries for each record's related data (e.g. author, tags, comment counts). We diagnosed it using `assertNumQueries()`, which captured 15 queries for 5 posts. We eliminated it by using `select_related('author')` for a single SQL JOIN, `prefetch_related('tags')` to load all tags in 1 query, and `annotate(likes_count=Count(...))` to compute totals in the initial SELECT statement, reducing it to constant queries.
+2. Q: What is IMDSv2 and why is it preferred over IMDSv1?
+   A: AWS Instance Metadata Service Version 2 (IMDSv2) uses session-oriented requests requiring a `PUT` request with a token header (`X-aws-ec2-metadata-token`) before retrieving metadata. This mitigates Server-Side Request Forgery (SSRF) and open reverse proxy vulnerabilities that previously allowed attackers to exploit simple `GET` requests in IMDSv1.
+3. Q: How does the application ensure telemetry tracking never degrades reliability?
+   A: Telemetry measurements use Python's built-in `time.perf_counter()` which adds microsecond overhead. Committing `ActivityEvent` models is wrapped in exception handlers so that any logging or telemetry failure is silently handled, guaranteeing that primary user workflows (creating posts, comments, likes) never fail due to monitoring errors.
+**Can I honestly put this on my resume?** Yes — Built an in-app cloud telemetry engine tracking granular sub-service latencies (EC2, S3, RDS, Bedrock), optimized Django ORM queries eliminating N+1 bottlenecks, and integrated IMDSv2 infrastructure discovery endpoints.
+
+---
+
+## Phase 8.2 — Frontend Modernization, Masonry Feed, & AI Generation Refinement (November 21, 2026)
+**What I built:** Executed a full UI/UX overhaul across the application. Replaced the top navbar with a collapsible left sidebar icon rail (~72px expanding to 230px on hover/toggle, converting to bottom navigation on mobile). Added a top search bar and global status strip displaying "Health: 200 OK", region, DB engine, storage type, and AI mode. Rebuilt the home feed into a pure Masonry card stream using 3 responsive column containers that append incoming cards to the shortest column without reflow jumping. Added infinite scroll using modern `IntersectionObserver` fetching 12-item JSON batches with duplicate rejection, skeleton loading, and noscript fallback. Prevented cumulative layout shift (CLS) by storing `image_width` and `image_height` via Pillow and setting explicit CSS `aspect-ratio` on all images. Built full dedicated pages for Trending Analytics (hero top 3 with score breakdown bars, rank changes, formula banner, and 15s auto-refresh), Cloud Activity (interactive pipeline latency viewer), AWS Cloud Architecture, and AI Insights. Refined the AI suggestion generator with stop-word filtering and 4 distinct title styles (statement, question, short headline, story).
+**New concepts:**
+- Cumulative Layout Shift (CLS) & Aspect-Ratio — When images load without explicit dimensions, content jumps as image bytes arrive, causing poor UX. By storing image dimensions in the database on upload and rendering `aspect-ratio: width / height`, browsers reserve exact vertical space prior to network completion.
+- Column-Container Masonry vs. CSS Multi-Column — CSS `column-count` automatically reflows all items across columns whenever new items are appended via infinite scroll, causing visual flickering. Using 3 separate container columns and appending new elements to the currently shortest column maintains stable vertical layout while preserving responsive breakpoints.
+- IntersectionObserver API — A high-performance browser API that asynchronously observes when a target element (sentinel) enters the viewport, replacing expensive scroll event listeners for infinite scrolling.
+- De-Duplication Sets in Dynamic Feeds — Managing a JavaScript `Set` of post IDs already present in the DOM prevents duplicated items if new records are published while a user is actively scrolling.
+**Problems faced and fixes:**
+- Infinite scroll cards reflowed and rearranged jarringly when using CSS multi-columns: implemented 3 separate column containers (`#col-0`, `#col-1`, `#col-2`) with JavaScript `appendCardToShortest()` measuring container heights and appending to the shortest column, delivering smooth infinite scrolling.
+- `assertNumQueries` test failed after removing sidebar widgets: the test previously expected 5 queries because the sidebar rendered trending post tags. With widgets moved to dedicated pages, `PostListView` required only 4 queries; updated test assertions to accurately reflect the 4 constant queries.
+**Likely questions and my answers:**
+1. Q: How does the application prevent layout jumps (CLS) when loading user images in the masonry feed?
+   A: On model save, Pillow inspects the uploaded image binary to record `image_width` and `image_height` in nullable database columns. In the HTML template, `<img>` tags declare `aspect-ratio: width / height`, `loading="lazy"`, and `decoding="async"`. The browser calculates and reserves the exact height before the image file is downloaded over the network, completely eliminating layout shifting.
+2. Q: Why did you use IntersectionObserver instead of a scroll event listener for endless vertical scroll?
+   A: A traditional `window.addEventListener('scroll')` runs on every single pixel scrolled, which requires throttling/debouncing and can cause main-thread jank. The modern `IntersectionObserver` API runs off the main thread and notifies the application only when a target sentinel element crosses a specified viewport threshold (e.g. 400px before reaching the bottom).
+3. Q: How does the Mock AI engine generate realistic suggestions without calling Bedrock?
+   A: The mock service strips English stop words (prepositions, articles, fillers) to extract high-intent keywords for hashtags. It parses the author's primary sentence and generates 4 distinct title styles (declarative statement, curiosity question, punchy headline, and story-style framing) without using generic buzzwords unless the post explicitly discusses technology.
+**Can I honestly put this on my resume?** Yes — Built a responsive Masonry web feed with endless vertical scrolling using IntersectionObserver, eliminated Cumulative Layout Shift via Pillow-calculated aspect ratios, and developed real-time cloud telemetry and analytics dashboards.
+
+---
+
+## Phase 8.3 — Frontend Polish & Post Detail Experience (November 21, 2026)
+**What I built:** Polished the application navigation and post interaction experience. Centered the `+` icon in the collapsed sidebar button and removed duplicate plus text. Configured the expanded sidebar to overlay content with high z-index and drop-shadow without shifting page content. Pinned "Settings" and CSRF-protected "Logout" to the sidebar bottom. Created a dedicated Settings page (`/settings/`) supporting profile inspection, password change via Django's `PasswordChangeView`, theme switching (light/dark), and status strip visibility toggling persisted in `localStorage`. Overhauled the Post Detail view into an asymmetric 55% / 45% sticky two-column layout on desktop: the left side anchors media with `object-fit: contain` and fullscreen lightbox modal support, while the right side organizes post details in strict hierarchy (title, author/date, basic metrics, hashtag chips, body, like/action buttons, newest comments first, and comment form). Added browser-history-aware back navigation and real-time cloud timing toasts.
+**New concepts:**
+- Sticky Two-Column Reading Layouts — Positioning media containers with `position: sticky; top: 75px; align-self: flex-start;` keeps visual context anchored on screen during prolonged scrolling through detailed technical discussion.
+- Zero-Library Lightbox Modals — Leveraging Bootstrap 5's native modal system (`data-bs-toggle="modal"`) to display high-resolution imagery without importing heavy external viewer dependencies.
+- Head Theme Preload Execution — Executing a tiny blocking script in `<head>` to read `localStorage` and set `data-bs-theme` before CSS parsing begins, preventing white screen flashes when dark mode is enabled.
+- Browser History Referrer Checks — Checking `document.referrer` against `window.location.host` enables intelligent `history.back()` navigation that preserves search filters and infinite scroll position when returning from post details.
+**Problems faced and fixes:**
+- Expanding sidebar shifted page layout horizontally: anchored `.app-wrapper` at a constant `margin-left: 72px` and set `.sidebar-rail` to `z-index: 1050`, allowing the rail to smoothly overlay the page without moving the top search bar or status strip.
+**Likely questions and my answers:**
+1. Q: How does the theme toggle prevent a flash of light mode when a user reloads the page with dark mode enabled?
+   A: Browsers parse and execute synchronous scripts in `<head>` before rendering DOM elements. By placing an IIFE in the `<head>` that reads `localStorage.getItem('appTheme')` and immediately sets `data-bs-theme` on `document.documentElement`, the initial paint renders in the user's preferred theme without any visual flashing.
+2. Q: Why use Django's built-in `PasswordChangeView` instead of writing custom password-handling views?
+   A: Django's `PasswordChangeView` utilizes `PasswordChangeForm`, which automatically validates old passwords, applies all configured password validators (length, common passwords, numeric, similarity), securely hashes new credentials via PBKDF2/SHA256, and calls `update_session_auth_hash()` to maintain the user's active session without logging them out.
+**Can I honestly put this on my resume?** Yes — Implemented a modern sticky multi-column post viewer with zero-dependency lightbox modal, history-aware navigation, user settings with password rotation, and client-side theme persistence.
+
+---
+
+## Phase 8.4 — Feed Restoration, Toast Consolidation & Mobile Navigation Polish (November 23, 2026)
+**What I built:** Fixed feed state loss upon navigating back from post details by establishing a resilient hybrid rendering model: the initial 12-item batch is always rendered directly on the server in HTML, while client-side script handles subsequent batches, bfcache (`pageshow`) reconnection, and sequential batch restoration from `sessionStorage`. Converted "Back to all posts" into a standard relative `{% url 'post_list' %}` URL to work reliably behind Nginx reverse proxies. Consolidated flash notifications into a single bottom-right toast container that auto-dismisses after 4 seconds and de-duplicates via `sessionStorage` (preventing alert banner duplication or repeating animations). Added a mobile "More" offcanvas bottom sheet housing Architecture and AI Insights pages, and served an inline cloud SVG favicon preventing console 404 errors. Added 4 unit tests covering server-side card rendering, feed cache-control headers, single consolidated toasts, and favicon routing.
+**New concepts:**
+- Back-Forward Cache (bfcache) Lifecycle — Modern browsers preserve the entire in-memory state of visited pages for instant back/forward navigation. When restoring from bfcache, `DOMContentLoaded` is bypassed and `pageshow` fires with `event.persisted = true`. Event listeners and observers (such as `IntersectionObserver`) must explicitly listen to `pageshow` to re-synchronize state.
+- Server-First Progressive Enhancement — Ensuring the server generates complete DOM markup for the initial data batch means the page is instantly readable and usable even if client JavaScript fails, network drops, or browser extensions interfere.
+- Notification De-Duplication & Single Toast Container — Instead of scattering flash banners across the top of the viewport and rendering duplicate toasts in the corner, routing all application events through a single toast container with client-side event tracking guarantees clean, non-intrusive notifications.
+- HTTP Cache-Control on Dynamic Feed Endpoints — Using `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` ensures browsers and proxies never store or serve stale, empty, or cached pagination fragments during dynamic feed scrolling.
+**Problems faced and fixes:**
+- Clicking "Back to all posts" restored a blank feed because `post_detail.html` executed `history.back()`, which did not re-run `DOMContentLoaded` in `post_list.html`: removed `history.back()` interception in favor of a standard relative link, and re-initialized the feed and re-attached the `IntersectionObserver` on both `DOMContentLoaded` and `pageshow`.
+- Toasts looped and bounced because `SuccessMessageMixin` added a message while `form_valid()` added a second, and the HTML hard-coded `.show` while JS called `.show()`: removed `SuccessMessageMixin`, unified messages into one cloud-latency string in `form_valid()`, and removed static `.show` classes from HTML.
+**Likely questions and my answers:**
+1. Q: Why did the infinite scroll feed break when returning from a post detail page, and how did you resolve it?
+   A: Modern browsers restore previous pages from the Back-Forward Cache (bfcache) rather than reloading them, which fires the `pageshow` event instead of `DOMContentLoaded`. Because our observer was set up only in `DOMContentLoaded`, the observer remained detached upon returning. We resolved it by converting the Back button into a standard relative URL (`{% url 'post_list' %}`), listening to both `DOMContentLoaded` and `pageshow` (`event.persisted`), ensuring the first batch of 12 posts is always rendered into the HTML by Django on the server, and sequentially restoring any extra loaded batches from `sessionStorage`.
+2. Q: What is `Cache-Control: no-store` and why is it essential for API feed endpoints?
+   A: `Cache-Control: no-store` instructs both the browser and intermediary HTTP proxies (such as CloudFront or Nginx) to never store any version of the response in cache. For infinite-scroll JSON endpoints like `/posts/feed/?page=2`, this prevents the browser from serving an empty or stale cached batch when users navigate back and forth or new posts are published.
+**Can I honestly put this on my resume?** Yes — Engineered a bfcache-resilient infinite scroll feed with server-rendered fallback and scroll position restoration, consolidated cloud telemetry toasts, and built mobile offcanvas navigation.
+
+---
+
+## Phase 8.5 — 4-Column Desktop Masonry Layout & 16-Post Batching (November 23, 2026)
+**What I built:** Expanded the desktop feed from 3 to 4 columns on screens $\ge 1200\text{px}$ (3 columns from $900\text{px}$, 2 from $576\text{px}$, 1 below that). Sourced the responsive column counts from a single JavaScript configuration array (`COLUMN_BREAKPOINTS`). Implemented dynamic card rebalancing upon window resize across breakpoints, redistributing cards across active columns in stable DOM order without reloading. Increased batch size from 12 to 16 posts across both server rendering and the JSON feed API (`post_feed_api`), matching 4-column symmetry ($16 \div 4 = 4$). Compacted the post cards for narrower column widths: title clamped to 2 lines with ellipsis, hashtags limited to 2 chips on a single nowrap line, padding reduced to `0.75rem`, and author metadata and like/comment counts aligned on a single line. Updated unit tests to expect 16-item initial renders and 16-item pagination batches.
+**New concepts:**
+- Single Source of Truth for Layout Breakpoints — Defining breakpoint thresholds and column counts in a single centralized config array avoids dispersed magic numbers across media queries and resize listeners.
+- Dynamic Masonry Rebalancing — When screen size crosses a responsive threshold, wiping column contents and re-appending elements in original DOM order using `appendCardToShortest()` keeps heights balanced and card order stable without reloading or refetching.
+**Problems faced and fixes:**
+- Cards in 4 columns felt visually cramped with multi-line tags and 3-line titles: clamped titles to 2 lines with CSS `-webkit-line-clamp: 2`, sliced hashtags to a maximum of 2 chips on one line, and aligned author and metrics on a single row.
+**Likely questions and my answers:**
+1. Q: How does the 4-column masonry layout handle browser resizing without flickering or losing user scroll?
+   A: The layout defines a single JavaScript breakpoint structure `COLUMN_BREAKPOINTS`. A debounced resize event listener checks if the active column count changed. If so, it preserves the DOM array of `.post-feed-card` elements, clears the column containers, and sequentially appends each card to the currently shortest active column. Cards stay in chronological order and heights remain balanced without any network requests.
+**Can I honestly put this on my resume?** Yes — Built a responsive 4-column Masonry feed with dynamic runtime rebalancing and optimized compact card typography.
+
+
+
+
+
 

@@ -62,6 +62,39 @@ class AIAssistTests(TestCase):
         self.assertTrue(isinstance(suggestions['summary'], str))
         self.assertGreater(len(suggestions['summary']), 10)
 
+    @override_settings(AI_MOCK_MODE=True)
+    def test_mock_mode_distinct_styles_and_stop_words_removal(self):
+        """Mock suggestions produce 4 titles in distinct styles and omit tech boilerplate for non-tech text."""
+        self.client.login(username='dave', password='password123')
+        non_tech_body = (
+            "They are very excited about our peaceful morning walk in the quiet botanical garden. "
+            "Fresh flowers and trees brought a deep sense of calm and rejuvenation to the whole family."
+        )
+        response = self.client.post(
+            self.suggest_url,
+            data=json.dumps({'body': non_tech_body}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        suggestions = data['suggestions']
+        titles = suggestions['titles']
+        self.assertEqual(len(titles), 4)
+
+        # Verify no generic tech boilerplate in non-tech post
+        for t in titles:
+            self.assertNotIn("Building Scalable Systems", t)
+            self.assertNotIn("Best Practices", t)
+
+        # Verify stop words are not present in hashtags
+        hashtags = suggestions['hashtags']
+        for stop in ['very', 'they', 'the', 'in', 'our', 'and']:
+            self.assertNotIn(stop, hashtags)
+
+        # Verify summary is author's first sentence trimmed <= 150 chars
+        self.assertLessEqual(len(suggestions['summary']), 150)
+        self.assertTrue(suggestions['summary'].startswith("They are very excited"))
+
     @override_settings(AI_MOCK_MODE=False, AWS_REGION='ap-southeast-2', BEDROCK_MODEL_ID='amazon.nova-lite-v1:0')
     @patch('boto3.client')
     def test_real_bedrock_converse_path_with_mocked_boto3(self, mock_boto3_client):

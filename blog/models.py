@@ -28,6 +28,8 @@ class Post(models.Model):
     summary = models.CharField(max_length=300, blank=True)
     image = models.ImageField(upload_to='posts/', blank=True)
     image_alt = models.CharField(max_length=255, blank=True)
+    image_width = models.PositiveIntegerField(null=True, blank=True)
+    image_height = models.PositiveIntegerField(null=True, blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='posts')
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -35,6 +37,22 @@ class Post(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        # Automatically extract and store image dimensions to prevent layout jumps in masonry feeds
+        if self.image:
+            try:
+                from PIL import Image
+                # Seek to beginning in case file pointer was previously read
+                if hasattr(self.image, 'file') and hasattr(self.image.file, 'seek'):
+                    self.image.file.seek(0)
+                with Image.open(self.image) as img:
+                    self.image_width, self.image_height = img.size
+                if hasattr(self.image, 'file') and hasattr(self.image.file, 'seek'):
+                    self.image.file.seek(0)
+            except Exception:
+                pass
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title

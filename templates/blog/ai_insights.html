@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Insights &middot; AWS Django Blog{% endblock %}
+
+{% block content %}
+<div class="ai-insights-container mx-auto" style="max-width: 1050px;">
+    <!-- Page Header -->
+    <div class="mb-4">
+        <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+            <i class="bi bi-cpu-fill" style="color: #7c3aed;"></i> Amazon Bedrock AI Insights
+        </h1>
+        <p class="text-muted small mb-0">
+            Real-time inference telemetry and performance metrics for the generative AI assistant powered by Amazon Bedrock.
+        </p>
+    </div>
+
+    <!-- Telemetry Metric Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="card border-0 rounded-4 shadow-sm p-3 bg-white h-100">
+                <div class="text-muted small mb-1">Total Invocations</div>
+                <div class="h3 fw-bold mb-0 text-dark" id="ai-stat-total">&hellip;</div>
+                <small class="text-secondary" style="font-size: 0.75rem;">Lifetime suggestion calls</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card border-0 rounded-4 shadow-sm p-3 bg-white h-100">
+                <div class="text-muted small mb-1">Average Latency</div>
+                <div class="h3 fw-bold mb-0 text-primary" id="ai-stat-latency">&hellip;</div>
+                <small class="text-secondary" style="font-size: 0.75rem;">End-to-end API response</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card border-0 rounded-4 shadow-sm p-3 bg-white h-100">
+                <div class="text-muted small mb-1">Foundation Model</div>
+                <div class="h5 fw-bold mb-0 text-truncate text-dark" id="ai-stat-model" title="Amazon Nova Lite">Nova Lite</div>
+                <small class="text-secondary" style="font-size: 0.75rem;">ap-southeast-2 (Sydney)</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card border-0 rounded-4 shadow-sm p-3 bg-white h-100">
+                <div class="text-muted small mb-1">Runtime Mode</div>
+                <div class="h4 fw-bold mb-0" id="ai-stat-mode" style="color: #7c3aed;">Detecting&hellip;</div>
+                <small class="text-secondary" style="font-size: 0.75rem;">Zero-cost local fallback</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Architecture & Prompt Quality Explanation -->
+    <div class="card border-0 rounded-4 shadow-sm p-4 bg-white mb-4">
+        <h2 class="h5 fw-bold mb-3 d-flex align-items-center gap-2">
+            <i class="bi bi-stars text-warning"></i> Multi-Style Suggestion Generation
+        </h2>
+        <div class="row g-4">
+            <div class="col-md-6">
+                <h3 class="h6 fw-bold text-secondary">4 Distinct Title Styles</h3>
+                <p class="small text-muted mb-2">
+                    Rather than generic templates, the engine parses the author's primary thesis and generates 4 tailored perspectives:
+                </p>
+                <ul class="small text-secondary ps-3 mb-0">
+                    <li><strong>Direct Statement:</strong> Clear, informative claim.</li>
+                    <li><strong>Question:</strong> Sparks curiosity and reader engagement.</li>
+                    <li><strong>Short Headline:</strong> Punchy, modern 2-5 word hook.</li>
+                    <li><strong>Story Style:</strong> Personal narrative or journey framing.</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h3 class="h6 fw-bold text-secondary">Smart Hashtags &amp; Summaries</h3>
+                <p class="small text-muted mb-2">
+                    Natural language filters strip out high-frequency stop words (<em>very, they, a, lot, the, in, my</em>) ensuring high-intent, SEO-ready hashtags.
+                </p>
+                <div class="alert alert-light border small text-muted mb-0">
+                    <i class="bi bi-shield-check text-success me-1"></i>
+                    <strong>IAM Policy:</strong> Bedrock Runtime calls are strictly scoped via IAM policy to <code>arn:aws:bedrock:ap-southeast-2::foundation-model/amazon.nova-lite-v1:0</code>.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive AI Live Tester -->
+    <div class="card border-0 rounded-4 shadow-sm p-4 bg-white">
+        <h2 class="h5 fw-bold mb-2">Test AI Suggestion API Live</h2>
+        <p class="small text-muted mb-3">
+            Enter sample draft content below to test the suggestion API endpoint (<code>/api/ai/suggest/</code>) and view real latency measurements.
+        </p>
+
+        <div class="mb-3">
+            <label for="ai-test-input" class="form-label small fw-semibold text-secondary">Draft Body Text</label>
+            <textarea id="ai-test-input" class="form-control" rows="3" placeholder="I was learning how to configure AWS Application Load Balancers with Django and Gunicorn. It took several attempts to get the health checks passing..."></textarea>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <button id="run-ai-test-btn" class="btn btn-primary rounded-pill px-4">
+                <span id="ai-btn-spinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                <i class="bi bi-lightning-charge me-1"></i> Generate Suggestions
+            </button>
+            <span class="small text-muted font-monospace" id="ai-test-timing"></span>
+        </div>
+
+        <!-- Result Box -->
+        <div id="ai-test-result" class="d-none alert alert-light border rounded-3 p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold small text-dark">Suggestions Returned:</span>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis" id="ai-result-badge">Demo Mode</span>
+            </div>
+            <div class="mb-2">
+                <strong class="small text-secondary">Generated Titles:</strong>
+                <ul class="small mb-2 ps-3" id="ai-result-titles"></ul>
+            </div>
+            <div class="mb-2">
+                <strong class="small text-secondary">Cleaned Hashtags:</strong>
+                <div id="ai-result-hashtags" class="d-flex flex-wrap gap-1 mt-1"></div>
+            </div>
+            <div>
+                <strong class="small text-secondary">Summary:</strong>
+                <p class="small text-muted mb-0" id="ai-result-summary"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load Telemetry Stats
+    fetch('/api/ai-insights/')
+        .then(res => res.json())
+        .then(data => {
+            const statTotal = document.getElementById('ai-stat-total');
+            const statLatency = document.getElementById('ai-stat-latency');
+            const statModel = document.getElementById('ai-stat-model');
+            const statMode = document.getElementById('ai-stat-mode');
+
+            if (statTotal) statTotal.textContent = data.total_suggestions || 0;
+            if (statLatency) statLatency.textContent = `${Number(data.average_latency_ms || 0).toFixed(1)} ms`;
+            if (statModel) statModel.textContent = data.model_id || 'amazon.nova-lite-v1:0';
+            if (statMode) {
+                if (data.mode === 'bedrock') {
+                    statMode.innerHTML = `<span class="badge bg-success-subtle text-success border border-success-subtle">Bedrock Live</span>`;
+                } else {
+                    statMode.innerHTML = `<span class="badge bg-warning-subtle text-dark border border-warning-subtle">Mock Mode</span>`;
+                }
+            }
+        })
+        .catch(() => {});
+
+    // Live AI Suggestion Tester
+    const testBtn = document.getElementById('run-ai-test-btn');
+    const inputEl = document.getElementById('ai-test-input');
+    const spinner = document.getElementById('ai-btn-spinner');
+    const timingEl = document.getElementById('ai-test-timing');
+    const resultBox = document.getElementById('ai-test-result');
+    const titlesList = document.getElementById('ai-result-titles');
+    const hashtagsBox = document.getElementById('ai-result-hashtags');
+    const summaryEl = document.getElementById('ai-result-summary');
+    const badgeEl = document.getElementById('ai-result-badge');
+
+    if (testBtn) {
+        testBtn.addEventListener('click', function() {
+            const text = (inputEl.value || '').trim();
+            if (!text) {
+                alert('Please enter some text in the box to test AI suggestions.');
+                return;
+            }
+
+            spinner.classList.remove('d-none');
+            testBtn.disabled = true;
+            timingEl.textContent = 'Calling AI engine...';
+
+            const startTime = performance.now();
+
+            fetch('/api/ai/suggest/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ body: text })
+            })
+            .then(res => res.json())
+            .then(data => {
+                const elapsed = (performance.now() - startTime).toFixed(1);
+                spinner.classList.add('d-none');
+                testBtn.disabled = false;
+                timingEl.textContent = `Completed in ${elapsed} ms`;
+
+                if (data.titles && data.titles.length > 0) {
+                    resultBox.classList.remove('d-none');
+                    titlesList.innerHTML = data.titles.map(t => `<li>${t}</li>`).join('');
+                    hashtagsBox.innerHTML = (data.hashtags || []).map(h => `<span class="badge bg-primary-subtle text-primary border border-primary-subtle">${h}</span>`).join(' ');
+                    summaryEl.textContent = data.summary || 'None';
+                    badgeEl.textContent = data.badge || (data.mode === 'mock' ? 'Demo Mode' : 'Amazon Bedrock');
+                } else {
+                    alert('Error: ' + (data.error || 'Could not generate suggestions.'));
+                }
+            })
+            .catch(err => {
+                spinner.classList.add('d-none');
+                testBtn.disabled = false;
+                timingEl.textContent = 'Error occurred';
+                console.error(err);
+            });
+        });
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+{% endblock %}

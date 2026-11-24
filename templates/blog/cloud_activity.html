@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+
+{% block title %}Cloud Activity & Pipeline Telemetry &middot; AWS Django Blog{% endblock %}
+
+{% block content %}
+<style>
+    .service-badge-django { background-color: #334155; color: #ffffff; }
+    .service-badge-rds { background-color: #2563eb; color: #ffffff; }
+    .service-badge-sqlite { background-color: #475569; color: #ffffff; }
+    .service-badge-s3 { background-color: #ea580c; color: #ffffff; }
+    .service-badge-bedrock { background-color: #7c3aed; color: #ffffff; }
+    .service-badge-mockai { background-color: #9333ea; color: #ffffff; }
+    .service-badge-analytics { background-color: #0891b2; color: #ffffff; }
+    .service-badge-trending { background-color: #e11d48; color: #ffffff; }
+
+    .pipeline-step-bar {
+        height: 6px;
+        border-radius: 3px;
+        background-color: #e2e8f0;
+        overflow: hidden;
+    }
+
+    .pipeline-step-fill {
+        height: 100%;
+        transition: width 0.4s ease;
+    }
+
+    .activity-card {
+        transition: transform 0.15s ease;
+    }
+    .activity-card:hover {
+        transform: translateY(-2px);
+    }
+</style>
+
+<div class="cloud-activity-container mx-auto" style="max-width: 1050px;">
+    <!-- Page Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2">
+                <i class="bi bi-lightning-charge-fill text-info"></i> Live Cloud Activity
+            </h1>
+            <p class="text-muted small mb-0">
+                Transparent step-by-step latency profiling across AWS EC2, RDS/SQLite, S3, Bedrock AI, and Analytics.
+            </p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle d-inline-flex align-items-center gap-1.5 py-1.5 px-3 rounded-pill">
+                <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.45rem; height: 0.45rem;" role="status"></span>
+                <span>Live Streaming (5s)</span>
+            </span>
+            <button id="refresh-activity-btn" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Now
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="card border-0 rounded-4 shadow-sm p-3 bg-white h-100">
+                <div class="text-muted small mb-1">Total Profiled Events</div>
+                <div class="h4 fw-bold mb-0 text-dark" id="stat-total-events">&hellip;</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card border-0 rounded-4 shadow-sm p-3 bg-white h-100">
+                <div class="text-muted small mb-1">Average Latency</div>
+                <div class="h4 fw-bold mb-0 text-primary" id="stat-avg-latency">&hellip;</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card border-0 rounded-4 shadow-sm p-3 bg-white h-100">
+                <div class="text-muted small mb-1">Database Service</div>
+                <div class="h4 fw-bold mb-0 text-dark" id="stat-db-engine">Detecting&hellip;</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card border-0 rounded-4 shadow-sm p-3 bg-white h-100">
+                <div class="text-muted small mb-1">AI Inference Engine</div>
+                <div class="h4 fw-bold mb-0 text-purple" style="color: #7c3aed;" id="stat-ai-mode">Nova Lite</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Stream -->
+    <div id="activity-feed" class="d-flex flex-column gap-3">
+        <div class="text-center py-5 text-muted" id="activity-loading">
+            <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+            Loading telemetry events&hellip;
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const feed = document.getElementById('activity-feed');
+    const loading = document.getElementById('activity-loading');
+    const statEvents = document.getElementById('stat-total-events');
+    const statAvg = document.getElementById('stat-avg-latency');
+    const statDb = document.getElementById('stat-db-engine');
+    const statAi = document.getElementById('stat-ai-mode');
+    const refreshBtn = document.getElementById('refresh-activity-btn');
+
+    let highestEventId = 0;
+    const knownEventIds = new Set();
+    let allEvents = [];
+
+    function getServiceClass(serviceName) {
+        if (!serviceName) return 'service-badge-django';
+        const s = serviceName.toLowerCase();
+        if (s.includes('rds')) return 'service-badge-rds';
+        if (s.includes('sqlite')) return 'service-badge-sqlite';
+        if (s.includes('s3')) return 'service-badge-s3';
+        if (s.includes('bedrock')) return 'service-badge-bedrock';
+        if (s.includes('mock ai')) return 'service-badge-mockai';
+        if (s.includes('analytics')) return 'service-badge-analytics';
+        if (s.includes('trending')) return 'service-badge-trending';
+        return 'service-badge-django';
+    }
+
+    function renderEventCard(evt) {
+        const card = document.createElement('div');
+        card.className = 'card border-0 rounded-4 shadow-sm bg-white activity-card p-3 p-md-4';
+        card.dataset.eventId = evt.id;
+
+        // Action tag label
+        const actionLabels = {
+            'post_created': 'Post Created',
+            'post_updated': 'Post Updated',
+            'post_deleted': 'Post Deleted',
+            'comment_added': 'Comment Added',
+            'liked': 'Post Liked',
+            'viewed': 'Post Viewed',
+            'ai_suggest': 'AI Inference',
+            'trending_recomputed': 'Trending Recalculated'
+        };
+        const actionLabel = actionLabels[evt.action] || evt.action;
+
+        // Render pipeline steps
+        const stepsHtml = (evt.steps && evt.steps.length > 0) ? evt.steps.map(step => {
+            const pct = evt.total_ms > 0 ? Math.min(100, Math.round((step.ms / evt.total_ms) * 100)) : 100;
+            const badgeClass = getServiceClass(step.service);
+            return `
+                <div class="mb-2.5">
+                    <div class="d-flex justify-content-between align-items-center small mb-1">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge ${badgeClass} rounded-pill px-2.5 py-0.5" style="font-size: 0.7rem;">${step.service}</span>
+                            <span class="fw-semibold text-dark">${step.label}</span>
+                            ${step.detail ? `<span class="text-muted">(${step.detail})</span>` : ''}
+                        </div>
+                        <span class="fw-bold text-secondary font-monospace">${step.ms.toFixed(1)} ms</span>
+                    </div>
+                    <div class="pipeline-step-bar">
+                        <div class="pipeline-step-fill ${badgeClass}" style="width: ${pct}%;"></div>
+                    </div>
+                </div>
+            `;
+        }).join('') : '<div class="text-muted small">No sub-steps recorded.</div>';
+
+        card.innerHTML = `
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom border-light-subtle">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1 fw-bold">
+                        ${actionLabel}
+                    </span>
+                    ${evt.post_title ? `<strong class="text-dark small">${evt.post_title}</strong>` : ''}
+                </div>
+                <div class="d-flex align-items-center gap-3 small text-muted">
+                    <span><i class="bi bi-clock me-1"></i>${evt.created_at}</span>
+                    <span class="badge bg-dark-subtle text-dark font-monospace px-2.5 py-1">
+                        Total: <strong>${evt.total_ms.toFixed(1)} ms</strong>
+                    </span>
+                </div>
+            </div>
+            <div class="pipeline-steps ps-1">
+                ${stepsHtml}
+            </div>
+            ${evt.user ? `<div class="mt-2 text-end text-muted" style="font-size: 0.72rem;">User: <strong>${evt.user}</strong></div>` : ''}
+        `;
+        return card;
+    }
+
+    function fetchActivity() {
+        fetch('/api/cloud-activity/')
+            .then(res => res.json())
+            .then(data => {
+                if (loading) loading.style.display = 'none';
+                if (!data || !data.events) return;
+
+                const events = data.events;
+                if (events.length === 0 && allEvents.length === 0) {
+                    feed.innerHTML = '<div class="card border-0 rounded-4 shadow-sm p-5 text-center text-muted bg-white">No cloud activity events logged yet. Perform an action like viewing or writing a post to see real AWS metrics!</div>';
+                    return;
+                }
+
+                let newItemsAdded = false;
+                // Reverse to display newest on top if not already
+                events.forEach(evt => {
+                    if (!knownEventIds.has(evt.id)) {
+                        knownEventIds.add(evt.id);
+                        allEvents.push(evt);
+                        if (evt.id > highestEventId) highestEventId = evt.id;
+
+                        // Prepend new card
+                        const cardEl = renderEventCard(evt);
+                        if (feed.firstChild && feed.firstChild.id !== 'activity-loading') {
+                            feed.insertBefore(cardEl, feed.firstChild);
+                        } else {
+                            feed.appendChild(cardEl);
+                        }
+                        newItemsAdded = true;
+                    }
+                });
+
+                // Update Stats
+                if (statEvents) statEvents.textContent = allEvents.length;
+                if (statAvg && allEvents.length > 0) {
+                    const avg = allEvents.reduce((acc, cur) => acc + cur.total_ms, 0) / allEvents.length;
+                    statAvg.textContent = `${avg.toFixed(1)} ms`;
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching cloud activity:', err);
+                if (loading) loading.style.display = 'none';
+            });
+    }
+
+    // Fetch cloud status for stat card headers
+    fetch('/api/cloud-status/')
+        .then(res => res.json())
+        .then(status => {
+            if (statDb) statDb.textContent = status.database_engine;
+            if (statAi) statAi.textContent = status.ai_mode === 'bedrock' ? 'Amazon Bedrock' : 'Mock AI';
+        })
+        .catch(() => {});
+
+    // Initial load + interval
+    fetchActivity();
+    setInterval(fetchActivity, 5000);
+
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', fetchActivity);
+    }
+});
+</script>
+{% endblock %}

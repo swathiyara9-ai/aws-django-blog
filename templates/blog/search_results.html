@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+
+{% block title %}Search Results for "{{ query }}" &middot; AWS Django Blog{% endblock %}
+
+{% block content %}
+<style>
+    .masonry-feed-container {
+        display: flex;
+        gap: 1.25rem;
+        align-items: flex-start;
+        width: 100%;
+    }
+
+    .masonry-col {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        min-width: 0;
+    }
+
+    .post-feed-card {
+        background-color: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .post-feed-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.09) !important;
+    }
+</style>
+
+<div class="search-feed-wrapper mx-auto" style="max-width: 1300px;">
+    <!-- Search Query Banner -->
+    <div class="mb-4">
+        <h1 class="h3 fw-bold mb-1">
+            Search Results
+        </h1>
+        <p class="text-muted small mb-0">
+            {% if query %}
+                Showing results matching <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6 px-2.5 py-1">&ldquo;{{ query }}&rdquo;</span> &middot; {{ posts|length }} post{{ posts|length|pluralize }} found
+            {% else %}
+                Please enter a search term in the search bar above.
+            {% endif %}
+        </p>
+    </div>
+
+    {% if not posts %}
+        <div class="card border-0 shadow-sm rounded-4 p-5 text-center my-4 bg-white">
+            <div class="mb-3">
+                <i class="bi bi-search text-secondary display-5"></i>
+            </div>
+            <h3 class="h5 fw-bold text-dark">No posts match your search</h3>
+            <p class="text-muted small mb-4">Try searching for other topics like AWS, Django, Bedrock, or S3.</p>
+            <div>
+                <a href="{% url 'post_list' %}" class="btn btn-outline-primary rounded-pill px-4">Back to All Posts</a>
+            </div>
+        </div>
+    {% else %}
+        <!-- Masonry 4-Column Feed matching Home -->
+        <div class="masonry-feed-container" id="search-masonry-feed">
+            <div class="masonry-col" id="col-0">
+                {% for post in col_0 %}
+                    {% include 'blog/_post_card.html' with post=post %}
+                {% endfor %}
+            </div>
+            <div class="masonry-col" id="col-1">
+                {% for post in col_1 %}
+                    {% include 'blog/_post_card.html' with post=post %}
+                {% endfor %}
+            </div>
+            <div class="masonry-col" id="col-2">
+                {% for post in col_2 %}
+                    {% include 'blog/_post_card.html' with post=post %}
+                {% endfor %}
+            </div>
+            <div class="masonry-col" id="col-3">
+                {% for post in col_3 %}
+                    {% include 'blog/_post_card.html' with post=post %}
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const col0 = document.getElementById('col-0');
+    const col1 = document.getElementById('col-1');
+    const col2 = document.getElementById('col-2');
+    const col3 = document.getElementById('col-3');
+    if (!col0) return;
+
+    const COLUMN_BREAKPOINTS = [
+        { minWidth: 1200, cols: 4 },
+        { minWidth: 900,  cols: 3 },
+        { minWidth: 576,  cols: 2 },
+        { minWidth: 0,    cols: 1 }
+    ];
+
+    function getTargetColumnCount() {
+        const width = window.innerWidth;
+        for (const bp of COLUMN_BREAKPOINTS) {
+            if (width >= bp.minWidth) return bp.cols;
+        }
+        return 1;
+    }
+
+    function getAllColumns() {
+        return [col0, col1, col2, col3].filter(Boolean);
+    }
+
+    function getActiveColumns() {
+        const count = getTargetColumnCount();
+        const allCols = getAllColumns();
+        allCols.forEach((col, idx) => {
+            if (idx < count) {
+                col.style.display = 'flex';
+            } else {
+                col.style.display = 'none';
+            }
+        });
+        return allCols.slice(0, count);
+    }
+
+    function appendCardToShortest(cardEl) {
+        const activeCols = getActiveColumns();
+        if (activeCols.length === 0) return;
+        let shortest = activeCols[0];
+        for (let i = 1; i < activeCols.length; i++) {
+            if (activeCols[i].offsetHeight < shortest.offsetHeight) {
+                shortest = activeCols[i];
+            }
+        }
+        shortest.appendChild(cardEl);
+    }
+
+    function rebalanceColumns() {
+        const allCols = getAllColumns();
+        if (allCols.length === 0) return;
+        const allCards = Array.from(document.querySelectorAll('.post-feed-card'));
+        allCols.forEach(c => c.innerHTML = '');
+        allCards.forEach(c => appendCardToShortest(c));
+    }
+
+    let currentColumnCount = getTargetColumnCount();
+    if (currentColumnCount < 4) {
+        rebalanceColumns();
+    }
+
+    let resizeTimer = null;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            const newCount = getTargetColumnCount();
+            if (newCount !== currentColumnCount) {
+                currentColumnCount = newCount;
+                rebalanceColumns();
+            }
+        }, 120);
+    });
+});
+</script>
+{% endblock %}

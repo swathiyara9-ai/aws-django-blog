@@ -4,69 +4,720 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}AWS Django Blog{% endblock %}</title>
+
+    <!-- Small SVG Cloud Favicon to prevent 404 in console -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>">
+
+    <!-- Immediate theme application to eliminate flash of unstyled/wrong theme -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('appTheme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-bs-theme', savedTheme);
+        })();
+    </script>
+
     <!-- Bootstrap 5 CSS CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-</head>
-<body class="d-flex flex-column min-vh-100 bg-light">
+    <!-- Bootstrap Icons CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 
-    <!-- Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="{% url 'post_list' %}">AWS Django Blog</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-refresh navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarContent">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'post_list' %}">Home</a>
+    <style>
+        :root, [data-bs-theme="light"] {
+            --sidebar-width: 72px;
+            --sidebar-expanded-width: 230px;
+
+            --app-bg: #f8fafc;
+            --surface: #ffffff;
+            --surface-2: #f1f5f9;
+            --surface-3: #e2e8f0;
+            --text-primary: #0f172a;       /* 17.5:1 contrast on white */
+            --text-secondary: #334155;     /* 9.4:1 contrast on white (WCAG AA compliant) */
+            --text-muted: #475569;         /* 5.5:1 contrast on white (WCAG AA compliant) */
+            --border: #e2e8f0;
+            --border-subtle: #cbd5e1;
+            --topbar-bg: #ffffff;
+            --input-bg: #f8fafc;
+            --input-border: #cbd5e1;
+            --status-strip-bg: #0f172a;
+            --status-strip-text: #cbd5e1;
+            --sidebar-bg: #0f172a;
+            --sidebar-text: #94a3b8;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.07);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.09);
+            --card-hover-shadow: 0 12px 28px rgba(0, 0, 0, 0.09);
+        }
+
+        [data-bs-theme="dark"] {
+            --sidebar-width: 72px;
+            --sidebar-expanded-width: 230px;
+
+            --app-bg: #090d16;
+            --surface: #111827;            /* Slate 900 */
+            --surface-2: #1e293b;          /* Slate 800 */
+            --surface-3: #334155;          /* Slate 700 */
+            --text-primary: #f8fafc;       /* 17.5:1 contrast on #111827 */
+            --text-secondary: #cbd5e1;     /* 9.6:1 contrast on #111827 (WCAG AA compliant) */
+            --text-muted: #94a3b8;         /* 5.3:1 contrast on #111827 (WCAG AA compliant) */
+            --border: #1f2937;
+            --border-subtle: #374151;
+            --topbar-bg: #111827;
+            --input-bg: #1e293b;
+            --input-border: #374151;
+            --status-strip-bg: #0b0f19;
+            --status-strip-text: #94a3b8;
+            --sidebar-bg: #0b0f19;
+            --sidebar-text: #94a3b8;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.55);
+            --card-hover-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+        }
+
+        body {
+            background-color: var(--app-bg) !important;
+            color: var(--text-primary) !important;
+            min-height: 100vh;
+        }
+
+        /* Semantic Surfaces & Cards */
+        .card, .theme-surface {
+            background-color: var(--surface) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border) !important;
+        }
+
+        .card-body {
+            color: var(--text-primary);
+        }
+
+        .bg-white {
+            background-color: var(--surface) !important;
+        }
+
+        .bg-light {
+            background-color: var(--surface-2) !important;
+            color: var(--text-primary) !important;
+        }
+
+        .bg-body {
+            background-color: var(--surface) !important;
+            color: var(--text-primary) !important;
+        }
+
+        /* Typography & Contrast */
+        .text-dark {
+            color: var(--text-primary) !important;
+        }
+
+        .text-secondary {
+            color: var(--text-secondary) !important;
+        }
+
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        /* Form Inputs */
+        .form-control, .form-select {
+            background-color: var(--input-bg) !important;
+            border-color: var(--input-border) !important;
+            color: var(--text-primary) !important;
+        }
+
+        .form-control:focus, .form-select:focus {
+            background-color: var(--surface) !important;
+            color: var(--text-primary) !important;
+            border-color: #3b82f6 !important;
+        }
+
+        .form-control::placeholder {
+            color: var(--text-muted) !important;
+            opacity: 0.8;
+        }
+
+        .form-label {
+            color: var(--text-secondary) !important;
+        }
+
+        /* Borders */
+        .border, .border-top, .border-bottom, .border-start, .border-end {
+            border-color: var(--border) !important;
+        }
+
+        .border-light-subtle {
+            border-color: var(--border) !important;
+        }
+
+        /* Tables */
+        .table {
+            --bs-table-bg: var(--surface);
+            --bs-table-color: var(--text-primary);
+            --bs-table-hover-bg: var(--surface-2);
+            --bs-table-border-color: var(--border);
+            color: var(--text-primary);
+        }
+
+        .table-light {
+            background-color: var(--surface-2) !important;
+            color: var(--text-primary) !important;
+        }
+
+        /* Modals */
+        .modal-content {
+            background-color: var(--surface) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border) !important;
+        }
+
+        /* Alerts & Callouts */
+        .alert-light {
+            background-color: var(--surface-2) !important;
+            border-color: var(--border) !important;
+            color: var(--text-primary) !important;
+        }
+
+        /* Badges */
+        .badge.bg-light {
+            background-color: var(--surface-2) !important;
+            color: var(--text-secondary) !important;
+            border: 1px solid var(--border) !important;
+        }
+
+        /* Desktop Left Sidebar Rail */
+        .sidebar-rail {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: var(--sidebar-width);
+            background-color: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            z-index: 1050; /* Higher than top bar so expanding overlays page content */
+            transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .sidebar-rail:hover,
+        .sidebar-rail.expanded {
+            width: var(--sidebar-expanded-width);
+            box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35);
+        }
+
+        .sidebar-brand {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 1.25rem;
+            color: #ffffff;
+            font-weight: 700;
+            text-decoration: none;
+            white-space: nowrap;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .sidebar-brand-icon {
+            font-size: 1.5rem;
+            min-width: 32px;
+            color: #38bdf8;
+        }
+
+        .sidebar-brand-text {
+            margin-left: 0.75rem;
+            font-size: 1rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .sidebar-rail:hover .sidebar-brand-text,
+        .sidebar-rail.expanded .sidebar-brand-text {
+            opacity: 1;
+        }
+
+        .sidebar-nav {
+            list-style: none;
+            padding: 0.5rem 0;
+            margin: 0;
+            flex-grow: 1;
+        }
+
+        .sidebar-item {
+            margin: 0.25rem 0.5rem;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 0.85rem;
+            color: var(--sidebar-text);
+            text-decoration: none;
+            border-radius: 0.5rem;
+            white-space: nowrap;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .sidebar-link:hover,
+        .sidebar-link.active {
+            background-color: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+        }
+
+        .sidebar-icon {
+            font-size: 1.35rem;
+            min-width: 34px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .sidebar-label {
+            margin-left: 0.75rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .sidebar-rail:hover .sidebar-label,
+        .sidebar-rail.expanded .sidebar-label {
+            opacity: 1;
+        }
+
+        /* Centered Create Button */
+        .sidebar-create-btn {
+            margin: 1rem 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            height: 44px;
+            border-radius: 0.5rem;
+            background-color: #2563eb;
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            transition: background-color 0.2s ease;
+        }
+
+        .sidebar-create-btn:hover {
+            background-color: #1d4ed8;
+            color: #ffffff;
+        }
+
+        .sidebar-create-icon {
+            font-size: 1.25rem;
+            min-width: calc(var(--sidebar-width) - 1rem); /* 56px: centers icon when rail is 72px */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sidebar-create-text {
+            margin-left: 0.25rem;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .sidebar-rail:hover .sidebar-create-text,
+        .sidebar-rail.expanded .sidebar-create-text {
+            opacity: 1;
+        }
+
+        /* Pinned Bottom Sidebar Area */
+        .sidebar-bottom {
+            margin-top: auto;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 0.5rem 0;
+        }
+
+        /* App Wrapper with Constant Sidebar Offset (Never shifted on hover) */
+        .app-wrapper {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Header Navigation */
+        .top-navbar {
+            background-color: var(--topbar-bg) !important;
+            border-bottom: 1px solid var(--border) !important;
+            position: sticky;
+            top: 0;
+            z-index: 1020;
+        }
+
+        .search-box {
+            max-width: 480px;
+            width: 100%;
+        }
+
+        .search-input {
+            border-radius: 2rem;
+            padding-left: 2.5rem;
+            background-color: var(--input-bg) !important;
+            border: 1px solid var(--input-border) !important;
+            color: var(--text-primary) !important;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            background-color: var(--surface) !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .search-icon-wrapper {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        /* Status Strip */
+        .status-strip {
+            background-color: var(--status-strip-bg);
+            color: var(--status-strip-text);
+            font-size: 0.78rem;
+            padding: 0.35rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Mobile Bottom Nav Bar */
+        .mobile-bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: var(--sidebar-bg);
+            z-index: 1040;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0.4rem 0.5rem;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.25);
+        }
+
+        .mobile-nav-link {
+            color: var(--sidebar-text);
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .mobile-nav-link.active,
+        .mobile-nav-link:hover {
+            color: #38bdf8;
+        }
+
+        .mobile-nav-link i {
+            font-size: 1.25rem;
+            margin-bottom: 0.15rem;
+        }
+
+        @media (max-width: 767.98px) {
+            .sidebar-rail {
+                display: none !important;
+            }
+            .app-wrapper {
+                margin-left: 0 !important;
+                padding-bottom: 70px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Desktop Left Sidebar Rail (~72px expands on hover with overlay) -->
+    <aside class="sidebar-rail d-none d-md-flex">
+        <a href="{% url 'post_list' %}" class="sidebar-brand">
+            <span class="sidebar-brand-icon"><i class="bi bi-cloud-check-fill"></i></span>
+            <span class="sidebar-brand-text">AWS Django Blog</span>
+        </a>
+
+        <!-- Prominent Create Button (Centered single + when collapsed, "Create Post" when expanded) -->
+        <a href="{% url 'post_create' %}" class="sidebar-create-btn" title="Create Post">
+            <span class="sidebar-create-icon"><i class="bi bi-plus-lg"></i></span>
+            <span class="sidebar-create-text">Create Post</span>
+        </a>
+
+        <!-- Main Navigation Links -->
+        <ul class="sidebar-nav">
+            <li class="sidebar-item">
+                <a href="{% url 'post_list' %}" class="sidebar-link {% if request.resolver_match.url_name == 'post_list' %}active{% endif %}">
+                    <span class="sidebar-icon"><i class="bi bi-house-door"></i></span>
+                    <span class="sidebar-label">Home</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="{% url 'trending_page' %}" class="sidebar-link {% if request.resolver_match.url_name == 'trending_page' %}active{% endif %}">
+                    <span class="sidebar-icon"><i class="bi bi-fire text-warning"></i></span>
+                    <span class="sidebar-label">Trending</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="{% url 'cloud_activity_page' %}" class="sidebar-link {% if request.resolver_match.url_name == 'cloud_activity_page' %}active{% endif %}">
+                    <span class="sidebar-icon"><i class="bi bi-lightning-charge text-info"></i></span>
+                    <span class="sidebar-label">Cloud Activity</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="{% url 'architecture_page' %}" class="sidebar-link {% if request.resolver_match.url_name == 'architecture_page' %}active{% endif %}">
+                    <span class="sidebar-icon"><i class="bi bi-diagram-3 text-primary"></i></span>
+                    <span class="sidebar-label">Architecture</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="{% url 'ai_insights_page' %}" class="sidebar-link {% if request.resolver_match.url_name == 'ai_insights_page' %}active{% endif %}">
+                    <span class="sidebar-icon"><i class="bi bi-cpu" style="color: #c084fc;"></i></span>
+                    <span class="sidebar-label">AI Insights</span>
+                </a>
+            </li>
+        </ul>
+
+        <!-- Pinned Bottom Navigation: Settings & Logout -->
+        <div class="sidebar-bottom">
+            <ul class="sidebar-nav p-0 m-0">
+                <li class="sidebar-item">
+                    <a href="{% url 'user_settings' %}" class="sidebar-link {% if request.resolver_match.url_name == 'user_settings' %}active{% endif %}" title="Settings">
+                        <span class="sidebar-icon"><i class="bi bi-gear"></i></span>
+                        <span class="sidebar-label">Settings</span>
+                    </a>
+                </li>
+                {% if user.is_authenticated %}
+                    <li class="sidebar-item">
+                        <form method="post" action="{% url 'logout' %}" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="sidebar-link w-100 bg-transparent border-0 text-start" title="Logout">
+                                <span class="sidebar-icon"><i class="bi bi-box-arrow-right text-danger"></i></span>
+                                <span class="sidebar-label text-danger">Logout</span>
+                            </button>
+                        </form>
                     </li>
-                </ul>
+                {% else %}
+                    <li class="sidebar-item">
+                        <a href="{% url 'login' %}" class="sidebar-link" title="Login">
+                            <span class="sidebar-icon"><i class="bi bi-box-arrow-in-right text-primary"></i></span>
+                            <span class="sidebar-label">Login</span>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+    </aside>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="mobile-bottom-nav d-md-none">
+        <a href="{% url 'post_list' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'post_list' %}active{% endif %}">
+            <i class="bi bi-house-door"></i>
+            <span>Home</span>
+        </a>
+        <a href="{% url 'trending_page' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'trending_page' %}active{% endif %}">
+            <i class="bi bi-fire text-warning"></i>
+            <span>Trending</span>
+        </a>
+        <a href="{% url 'post_create' %}" class="mobile-nav-link text-primary fw-bold">
+            <i class="bi bi-plus-circle-fill" style="font-size: 1.5rem;"></i>
+            <span>Create</span>
+        </a>
+        <a href="{% url 'cloud_activity_page' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'cloud_activity_page' %}active{% endif %}">
+            <i class="bi bi-lightning-charge text-info"></i>
+            <span>Activity</span>
+        </a>
+        <button class="mobile-nav-link border-0 bg-transparent {% if request.resolver_match.url_name in 'architecture_page,ai_insights_page,user_settings' %}active{% endif %}" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileMoreOffcanvas" aria-controls="mobileMoreOffcanvas">
+            <i class="bi bi-grid"></i>
+            <span>More</span>
+        </button>
+    </nav>
+
+    <!-- Mobile More Offcanvas Bottom Sheet (Phase 8 Polish) -->
+    <div class="offcanvas offcanvas-bottom rounded-top-4 d-md-none" tabindex="-1" id="mobileMoreOffcanvas" aria-labelledby="mobileMoreOffcanvasLabel" style="background-color: var(--surface); color: var(--text-primary); max-height: 60vh;">
+        <div class="offcanvas-header border-bottom border-light-subtle pb-2">
+            <h5 class="offcanvas-title fw-bold fs-6" id="mobileMoreOffcanvasLabel">
+                <i class="bi bi-grid-fill me-2 text-primary"></i>More Pages
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body p-3">
+            <div class="list-group list-group-flush">
+                <a href="{% url 'architecture_page' %}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3 rounded-3 border-0 {% if request.resolver_match.url_name == 'architecture_page' %}bg-primary-subtle text-primary fw-bold{% endif %}">
+                    <i class="bi bi-diagram-3 text-primary fs-4"></i>
+                    <div>
+                        <div class="fw-semibold">Architecture Map</div>
+                        <small class="text-muted">Interactive AWS Infrastructure Blueprint</small>
+                    </div>
+                </a>
+                <a href="{% url 'ai_insights_page' %}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3 rounded-3 border-0 {% if request.resolver_match.url_name == 'ai_insights_page' %}bg-primary-subtle text-primary fw-bold{% endif %}">
+                    <i class="bi bi-cpu fs-4" style="color: #8b5cf6;"></i>
+                    <div>
+                        <div class="fw-semibold">AI Insights</div>
+                        <small class="text-muted">Amazon Bedrock Telemetry & Suggestions</small>
+                    </div>
+                </a>
+                <a href="{% url 'user_settings' %}" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3 rounded-3 border-0 {% if request.resolver_match.url_name == 'user_settings' %}bg-primary-subtle text-primary fw-bold{% endif %}">
+                    <i class="bi bi-gear text-secondary fs-4"></i>
+                    <div>
+                        <div class="fw-semibold">Settings</div>
+                        <small class="text-muted">Profile, Password & Cloud Preferences</small>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area Offset by Sidebar (Content anchored at 72px) -->
+    <div class="app-wrapper">
+        <!-- Top Bar with Global Search & User Profile -->
+        <header class="top-navbar py-2 px-3">
+            <div class="container-fluid d-flex align-items-center justify-content-between gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{% url 'post_list' %}" class="d-md-none fw-bold text-dark text-decoration-none">
+                        <i class="bi bi-cloud-check-fill text-primary"></i> Blog
+                    </a>
+                </div>
+
+                <!-- Global Search Box -->
+                <div class="search-box mx-auto position-relative">
+                    <form action="{% url 'search' %}" method="get" class="m-0">
+                        <span class="search-icon-wrapper"><i class="bi bi-search"></i></span>
+                        <input type="search" name="q" class="form-control search-input" placeholder="Search title, content, hashtags..." value="{{ query|default:'' }}" aria-label="Search">
+                    </form>
+                </div>
+
+                <!-- User Profile Indicator (Logout in Sidebar) -->
                 <div class="d-flex align-items-center gap-2">
                     {% if user.is_authenticated %}
-                        <a href="{% url 'post_create' %}" class="btn btn-primary btn-sm">+ New Post</a>
-                        <span class="navbar-text text-light small me-2">Hi, <strong>{{ user.username }}</strong></span>
-                        <!-- Logout must be a POST request with CSRF token -->
-                        <form method="post" action="{% url 'logout' %}" class="d-inline m-0">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-outline-light btn-sm">Logout</button>
-                        </form>
+                        <span class="text-secondary small">Hi, <strong class="text-dark">{{ user.username }}</strong></span>
                     {% else %}
-                        <a href="{% url 'login' %}" class="btn btn-outline-light btn-sm">Login</a>
-                        <a href="{% url 'register' %}" class="btn btn-primary btn-sm">Register</a>
+                        <a href="{% url 'login' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Log In</a>
+                        <a href="{% url 'register' %}" class="btn btn-primary btn-sm rounded-pill px-3 d-none d-sm-inline">Register</a>
                     {% endif %}
                 </div>
             </div>
-        </div>
-    </nav>
+        </header>
 
-    <!-- Flash Messages -->
-    <div class="container mt-3">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <!-- Status Strip (Region, Database, Media Storage, AI Mode, Health) -->
+        <div class="status-strip" id="global-status-strip">
+            <div class="container-fluid d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle d-inline-flex align-items-center gap-1 py-1">
+                        <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.4rem; height: 0.4rem;" role="status"></span>
+                        <span id="cs-env">Detecting...</span>
+                    </span>
+                    <span class="text-secondary">&vert;</span>
+                    <span id="cs-db"><i class="bi bi-database me-1"></i>DB: ...</span>
+                    <span class="text-secondary">&vert;</span>
+                    <span id="cs-storage"><i class="bi bi-cloud me-1"></i>Storage: ...</span>
+                    <span class="text-secondary">&vert;</span>
+                    <span id="cs-ai"><i class="bi bi-cpu me-1"></i>AI: ...</span>
                 </div>
-            {% endfor %}
-        {% endif %}
-    </div>
-
-    <!-- Main Page Content -->
-    <main class="container my-4 flex-grow-1">
-        {% block content %}
-        {% endblock %}
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-white border-top py-3 text-center text-muted small mt-auto">
-        <div class="container">
-            <p class="mb-0">&copy; 2026 AWS Django Blog &middot; Built with Django &amp; AWS</p>
+                <div>
+                    <!-- Explicit instruction: Label MUST be 'Health: 200 OK' -->
+                    <span id="cs-health" class="badge bg-secondary-subtle text-secondary-emphasis border">Health: 200 OK</span>
+                </div>
+            </div>
         </div>
-    </footer>
+
+        <!-- Real Cloud Timing Toast Container (Single Bottom-Right Pinned Container) -->
+        <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="toast align-items-center border-0 shadow-lg text-bg-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}dark{% else %}primary{% endif %}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4000" data-bs-autohide="true">
+                        <div class="d-flex">
+                            <div class="toast-body d-flex align-items-center gap-2">
+                                <i class="bi bi-lightning-charge-fill text-warning fs-5"></i>
+                                <div>{{ message|safe }}</div>
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <!-- Primary Page Content -->
+        <main class="container-fluid px-4 py-3 flex-grow-1">
+            {% block content %}
+            {% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="border-top py-3 text-center text-muted small mt-auto" style="background-color: var(--surface);">
+            <div class="container-fluid">
+                <p class="mb-0">&copy; 2026 AWS Django Blog &middot; Cloud Engineering with Django &amp; AWS</p>
+            </div>
+        </footer>
+    </div>
 
     <!-- Bootstrap 5 JS Bundle CDN -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <!-- Cloud Status Bar Fetcher & Preferences Initializer -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Respect saved preference for cloud status strip visibility
+        const showStatus = localStorage.getItem('showCloudStatus');
+        const statusStrip = document.getElementById('global-status-strip');
+        if (statusStrip && showStatus === 'false') {
+            statusStrip.classList.add('d-none');
+        }
+
+        // Initialize Bootstrap Toasts with de-duplication
+        const toastElList = [].slice.call(document.querySelectorAll('.toast'));
+        toastElList.forEach(function(toastEl) {
+            const toastKey = 'toast_shown_' + (toastEl.textContent || '').trim().slice(0, 40);
+            if (!sessionStorage.getItem(toastKey)) {
+                sessionStorage.setItem(toastKey, '1');
+                const toast = new bootstrap.Toast(toastEl, { autohide: true, delay: 4000 });
+                toast.show();
+            } else {
+                toastEl.remove();
+            }
+        });
+
+        // Fetch cloud status data
+        fetch('/api/cloud-status/')
+            .then(res => res.json())
+            .then(data => {
+                const envEl = document.getElementById('cs-env');
+                const dbEl = document.getElementById('cs-db');
+                const storageEl = document.getElementById('cs-storage');
+                const aiEl = document.getElementById('cs-ai');
+                const healthEl = document.getElementById('cs-health');
+
+                if (envEl) {
+                    if (data.environment === 'ec2') {
+                        envEl.innerHTML = `<strong>EC2:</strong> ${data.region} (${data.availability_zone})`;
+                    } else {
+                        envEl.innerHTML = `<strong>Local:</strong> ${data.region}`;
+                    }
+                }
+                if (dbEl) dbEl.innerHTML = `<i class="bi bi-database me-1"></i><strong>${data.database_engine}</strong>`;
+                if (storageEl) {
+                    const s3Text = data.bucket_name.startsWith('None') ? 'Local media/' : `S3: ${data.bucket_name}`;
+                    storageEl.innerHTML = `<i class="bi bi-cloud me-1"></i><strong>${s3Text}</strong>`;
+                }
+                if (aiEl) {
+                    const modeTag = data.ai_mode === 'bedrock' ? 'Bedrock' : 'Mock AI';
+                    aiEl.innerHTML = `<i class="bi bi-cpu me-1"></i><strong>${data.ai_model}</strong> <span class="badge bg-warning-subtle text-dark ms-1">${modeTag}</span>`;
+                }
+                if (healthEl) {
+                    healthEl.className = 'badge bg-success-subtle text-success-emphasis border border-success-subtle';
+                    healthEl.textContent = 'Health: 200 OK';
+                }
+            })
+            .catch(() => {});
+    });
+    </script>
 </body>
 </html>
-

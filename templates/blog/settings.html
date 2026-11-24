@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}Account Settings &middot; AWS Django Blog{% endblock %}
+
+{% block content %}
+<div class="settings-container mx-auto" style="max-width: 800px;">
+    <!-- Page Header -->
+    <div class="mb-4">
+        <h1 class="h3 fw-bold mb-1 d-flex align-items-center gap-2 text-dark">
+            <i class="bi bi-gear-fill text-secondary"></i> Account &amp; App Settings
+        </h1>
+        <p class="text-secondary small mb-0">Manage your profile information, password, theme, and cloud telemetry visibility.</p>
+    </div>
+
+    <!-- 1. Account Profile Card -->
+    <div class="card border-0 rounded-4 shadow-sm p-4 mb-4">
+        <h2 class="h5 fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
+            <i class="bi bi-person-badge text-primary"></i> Profile Information
+        </h2>
+        <div class="row g-3">
+            <div class="col-sm-6">
+                <label class="text-secondary small fw-semibold d-block mb-1">Username</label>
+                <div class="fw-bold text-dark fs-6">{{ user.username }}</div>
+            </div>
+            <div class="col-sm-6">
+                <label class="text-secondary small fw-semibold d-block mb-1">Email Address</label>
+                <div class="text-dark">{{ user.email|default:"No email configured" }}</div>
+            </div>
+            <div class="col-sm-6">
+                <label class="text-secondary small fw-semibold d-block mb-1">Date Joined</label>
+                <div class="text-secondary small">{{ user.date_joined|date:"F j, Y, g:i a" }}</div>
+            </div>
+            <div class="col-sm-6">
+                <label class="text-secondary small fw-semibold d-block mb-1">Account Role</label>
+                <div>
+                    {% if user.is_staff %}
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Administrator / Staff</span>
+                    {% else %}
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Author / Community Member</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Display & Cloud Preferences Card -->
+    <div class="card border-0 rounded-4 shadow-sm p-4 mb-4">
+        <h2 class="h5 fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
+            <i class="bi bi-sliders text-info"></i> Display Preferences
+        </h2>
+
+        <!-- Theme Switch (Light / Dark) -->
+        <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+            <div>
+                <strong class="d-block text-dark">Interface Theme</strong>
+                <small class="text-secondary">Choose between light and dark visual themes across the application.</small>
+            </div>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Theme selection">
+                <button type="button" class="btn btn-outline-secondary" id="theme-light-btn">
+                    <i class="bi bi-sun-fill me-1 text-warning"></i> Light
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="theme-dark-btn">
+                    <i class="bi bi-moon-stars-fill me-1 text-info"></i> Dark
+                </button>
+            </div>
+        </div>
+
+        <!-- Cloud Status Strip Toggle -->
+        <div class="d-flex justify-content-between align-items-center py-3">
+            <div>
+                <strong class="d-block text-dark">Cloud Status Strip</strong>
+                <small class="text-secondary">Display the live AWS region, database, S3, and health indicator at the top of pages.</small>
+            </div>
+            <div class="form-check form-switch fs-5 m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="status-strip-toggle" checked>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Change Password Card (Django PasswordChangeView) -->
+    <div class="card border-0 rounded-4 shadow-sm p-4">
+        <h2 class="h5 fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
+            <i class="bi bi-shield-lock text-success"></i> Change Password
+        </h2>
+        <form method="post" action="{% url 'user_settings' %}">
+            {% csrf_token %}
+
+            {% if form.errors %}
+                <div class="alert alert-danger alert-dismissible fade show small" role="alert">
+                    Please correct the error(s) below.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endif %}
+
+            <div class="mb-3">
+                <label for="{{ form.old_password.id_for_label }}" class="form-label small fw-semibold text-secondary">Current Password</label>
+                <input type="password" name="{{ form.old_password.name }}" id="{{ form.old_password.id_for_label }}" class="form-control {% if form.old_password.errors %}is-invalid{% endif %}" required autocomplete="current-password">
+                {% for err in form.old_password.errors %}
+                    <div class="invalid-feedback">{{ err }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ form.new_password1.id_for_label }}" class="form-label small fw-semibold text-secondary">New Password</label>
+                <input type="password" name="{{ form.new_password1.name }}" id="{{ form.new_password1.id_for_label }}" class="form-control {% if form.new_password1.errors %}is-invalid{% endif %}" required autocomplete="new-password">
+                {% for err in form.new_password1.errors %}
+                    <div class="invalid-feedback">{{ err }}</div>
+                {% endfor %}
+                {% if form.new_password1.help_text %}
+                    <div class="form-text small text-secondary">{{ form.new_password1.help_text|safe }}</div>
+                {% endif %}
+            </div>
+
+            <div class="mb-4">
+                <label for="{{ form.new_password2.id_for_label }}" class="form-label small fw-semibold text-secondary">Confirm New Password</label>
+                <input type="password" name="{{ form.new_password2.name }}" id="{{ form.new_password2.id_for_label }}" class="form-control {% if form.new_password2.errors %}is-invalid{% endif %}" required autocomplete="new-password">
+                {% for err in form.new_password2.errors %}
+                    <div class="invalid-feedback">{{ err }}</div>
+                {% endfor %}
+            </div>
+
+            <button type="submit" class="btn btn-primary rounded-pill px-4">
+                <i class="bi bi-check2-circle me-1"></i> Update Password
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lightBtn = document.getElementById('theme-light-btn');
+    const darkBtn = document.getElementById('theme-dark-btn');
+
+    function updateThemeUI(theme) {
+        document.documentElement.setAttribute('data-bs-theme', theme);
+        localStorage.setItem('appTheme', theme);
+        if (theme === 'dark') {
+            if (darkBtn) {
+                darkBtn.classList.add('active', 'btn-primary');
+                darkBtn.classList.remove('btn-outline-secondary');
+            }
+            if (lightBtn) {
+                lightBtn.classList.remove('active', 'btn-primary');
+                lightBtn.classList.add('btn-outline-secondary');
+            }
+        } else {
+            if (lightBtn) {
+                lightBtn.classList.add('active', 'btn-primary');
+                lightBtn.classList.remove('btn-outline-secondary');
+            }
+            if (darkBtn) {
+                darkBtn.classList.remove('active', 'btn-primary');
+                darkBtn.classList.add('btn-outline-secondary');
+            }
+        }
+    }
+
+    const currentTheme = localStorage.getItem('appTheme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    updateThemeUI(currentTheme);
+
+    if (lightBtn) lightBtn.addEventListener('click', () => updateThemeUI('light'));
+    if (darkBtn) darkBtn.addEventListener('click', () => updateThemeUI('dark'));
+
+    // Status strip visibility switch
+    const stripToggle = document.getElementById('status-strip-toggle');
+    const statusStrip = document.getElementById('global-status-strip');
+    const savedStripPref = localStorage.getItem('showCloudStatus');
+
+    if (stripToggle) {
+        stripToggle.checked = savedStripPref !== 'false';
+        stripToggle.addEventListener('change', function() {
+            const isChecked = stripToggle.checked;
+            localStorage.setItem('showCloudStatus', isChecked ? 'true' : 'false');
+            if (statusStrip) {
+                if (isChecked) {
+                    statusStrip.classList.remove('d-none');
+                } else {
+                    statusStrip.classList.add('d-none');
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

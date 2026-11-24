@@ -1,159 +1,532 @@
 {% extends 'base.html' %}
 
-{% block title %}Home &middot; AWS Django Blog{% endblock %}
+{% block title %}Explore Posts &middot; AWS Django Blog{% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- Main Feed: Latest Posts -->
-    <div class="col-lg-8 mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="h3 fw-bold mb-0">Latest Posts</h1>
+<style>
+    /* Masonry 3-Column Containers */
+    .masonry-feed-container {
+        display: flex;
+        gap: 1.25rem;
+        align-items: flex-start;
+        width: 100%;
+    }
+
+    .masonry-col {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        min-width: 0;
+    }
+
+    .post-feed-card {
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .post-feed-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--card-hover-shadow) !important;
+    }
+
+    .card-post-img {
+        transition: transform 0.3s ease;
+    }
+
+    .post-feed-card:hover .card-post-img {
+        transform: scale(1.02);
+    }
+
+    /* Skeleton Loading Cards */
+    .skeleton-card {
+        background: var(--surface);
+        border-radius: 1rem;
+        border: 1px solid var(--border);
+        overflow: hidden;
+        animation: skeleton-pulse 1.5s infinite ease-in-out;
+    }
+
+    .skeleton-img {
+        height: 180px;
+        background-color: var(--surface-3);
+    }
+
+    .skeleton-line {
+        height: 12px;
+        background-color: var(--surface-3);
+        border-radius: 4px;
+        margin-bottom: 8px;
+    }
+
+    @keyframes skeleton-pulse {
+        0% { opacity: 0.6; }
+        50% { opacity: 1; }
+        100% { opacity: 0.6; }
+    }
+</style>
+
+<div class="feed-wrapper mx-auto" style="max-width: 1440px;">
+    {% if not posts %}
+        <div class="card border-0 shadow-sm rounded-4 p-5 text-center my-4">
+            <div class="mb-3">
+                <i class="bi bi-pencil-square text-primary display-4"></i>
+            </div>
+            <h3 class="h4 fw-bold">No posts published yet</h3>
+            <p class="text-muted mb-4">Be the first to share an article or cloud engineering tutorial!</p>
             {% if user.is_authenticated %}
-                <a href="{% url 'post_create' %}" class="btn btn-primary btn-sm">+ Write a Post</a>
+                <div>
+                    <a href="{% url 'post_create' %}" class="btn btn-primary rounded-pill px-4">+ Create First Post</a>
+                </div>
+            {% else %}
+                <div>
+                    <a href="{% url 'login' %}" class="btn btn-outline-primary rounded-pill px-4">Log in to write</a>
+                </div>
             {% endif %}
         </div>
+    {% else %}
+        <!-- Masonry 4-Column Container -->
+        <div class="masonry-feed-container" id="masonry-feed">
+            <div class="masonry-col" id="col-0">
+                {% for post in col_0 %}
+                    {% include 'blog/_post_card.html' with post=post %}
+                {% endfor %}
+            </div>
+            <div class="masonry-col" id="col-1">
+                {% for post in col_1 %}
+                    {% include 'blog/_post_card.html' with post=post %}
+                {% endfor %}
+            </div>
+            <div class="masonry-col" id="col-2">
+                {% for post in col_2 %}
+                    {% include 'blog/_post_card.html' with post=post %}
+                {% endfor %}
+            </div>
+            <div class="masonry-col" id="col-3">
+                {% for post in col_3 %}
+                    {% include 'blog/_post_card.html' with post=post %}
+                {% endfor %}
+            </div>
+        </div>
 
-        {% if posts %}
-            {% for post in posts %}
-                <div class="card mb-4 shadow-sm border-0 overflow-hidden">
-                    {% if post.image %}
-                        <a href="{% url 'post_detail' slug=post.slug %}">
-                            <img src="{{ post.image.url }}" 
-                                 alt="{{ post.image_alt|default:post.title }}" 
-                                 class="card-img-top" 
-                                 style="max-height: 240px; object-fit: cover;">
-                        </a>
-                    {% endif %}
-                    <div class="card-body p-4">
-                        <h2 class="h4 card-title mb-2">
-                            <a href="{% url 'post_detail' slug=post.slug %}" class="text-decoration-none text-dark fw-bold">
-                                {{ post.title }}
-                            </a>
-                        </h2>
-                        <div class="text-muted small mb-3">
-                            By <strong>{{ post.author.username }}</strong> &middot; {{ post.created_at|date:"F j, Y" }}
+        <!-- Scroll Sentinel for Endless Vertical Scroll -->
+        <div id="scroll-sentinel" class="py-4 text-center">
+            <!-- Skeleton / Loading State -->
+            <div id="loading-spinner" class="d-none">
+                <div class="row g-3 justify-content-center my-2" style="max-width: 900px; margin: 0 auto;">
+                    <div class="col-md-4 col-sm-6">
+                        <div class="skeleton-card p-3">
+                            <div class="skeleton-img rounded-3 mb-3"></div>
+                            <div class="skeleton-line w-75"></div>
+                            <div class="skeleton-line w-50"></div>
                         </div>
-                        <p class="card-text text-secondary mb-3">
-                            {% if post.summary %}
-                                {{ post.summary }}
-                            {% else %}
-                                {{ post.body|truncatewords:40 }}
-                            {% endif %}
-                        </p>
-                        
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <div>
-                                {% for tag in post.tags.all %}
-                                    <a href="{% url 'tag_posts' tag_name=tag.name %}" class="badge bg-secondary-subtle text-secondary-emphasis text-decoration-none me-1">
-                                        {{ tag }}
-                                    </a>
-                                {% endfor %}
-                            </div>
-                            <div class="d-flex align-items-center gap-3">
-                                <span class="text-muted small" title="Likes">&hearts; {{ post.likes.count }}</span>
-                                <span class="text-muted small" title="Comments">&#128172; {{ post.comments.count }}</span>
-                                <a href="{% url 'post_detail' slug=post.slug %}" class="btn btn-outline-primary btn-sm">Read More &rarr;</a>
-                            </div>
+                    </div>
+                    <div class="col-md-4 col-sm-6 d-none d-sm-block">
+                        <div class="skeleton-card p-3">
+                            <div class="skeleton-img rounded-3 mb-3"></div>
+                            <div class="skeleton-line w-75"></div>
+                            <div class="skeleton-line w-50"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-none d-md-block">
+                        <div class="skeleton-card p-3">
+                            <div class="skeleton-img rounded-3 mb-3"></div>
+                            <div class="skeleton-line w-75"></div>
+                            <div class="skeleton-line w-50"></div>
                         </div>
                     </div>
                 </div>
-            {% endfor %}
-
-            <!-- Pagination Controls -->
-            {% if is_paginated %}
-                <nav aria-label="Page navigation" class="mt-4">
-                    <ul class="pagination justify-content-center">
-                        {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">&laquo; Previous</a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">&laquo; Previous</span>
-                            </li>
-                        {% endif %}
-
-                        <li class="page-item disabled">
-                            <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-                        </li>
-
-                        {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next &raquo;</a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">Next &raquo;</span>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            {% endif %}
-
-        {% else %}
-            <div class="card p-5 text-center shadow-sm border-0">
-                <h4 class="text-muted mb-3">No posts published yet</h4>
-                <p class="text-secondary">Be the first to share an article!</p>
-                {% if user.is_authenticated %}
-                    <div class="mt-2">
-                        <a href="{% url 'post_create' %}" class="btn btn-primary">Create Your First Post</a>
-                    </div>
-                {% else %}
-                    <div class="mt-2">
-                        <a href="{% url 'register' %}" class="btn btn-primary me-2">Register to Post</a>
-                        <a href="{% url 'login' %}" class="btn btn-outline-secondary">Log In</a>
-                    </div>
-                {% endif %}
+                <div class="text-muted small mt-2">
+                    <span class="spinner-border spinner-border-sm text-primary me-1" role="status"></span>
+                    Loading more posts...
+                </div>
             </div>
-        {% endif %}
-    </div>
 
-    <!-- Sidebar: Trending Section (Phase 4) -->
-    <div class="col-lg-4">
-        <div class="card shadow-sm border-0 mb-4 sticky-top" style="top: 1.5rem; z-index: 10;">
-            <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
-                <h5 class="card-title h6 mb-0 fw-bold">
-                    <span class="text-warning">&#9733;</span> Trending Posts
-                </h5>
-                <span class="badge bg-warning text-dark small">Analytics</span>
+            <!-- Error / Retry State -->
+            <div id="loading-error" class="d-none py-3 text-center">
+                <div class="text-danger small mb-2">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i> Failed to load more posts.
+                </div>
+                <button type="button" id="retry-batch-btn" class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm">
+                    <i class="bi bi-arrow-clockwise me-1"></i> Retry
+                </button>
             </div>
-            <div class="card-body p-0">
-                {% if trending_stats %}
-                    <div class="list-group list-group-flush mb-0">
-                        {% for stat in trending_stats %}
-                            <div class="list-group-item py-3 px-3">
-                                <div class="d-flex align-items-center mb-1">
-                                    <span class="badge {% if forloop.counter == 1 %}bg-warning text-dark{% elif forloop.counter == 2 %}bg-secondary text-white{% elif forloop.counter == 3 %}bg-bronze bg-info text-white{% else %}bg-light text-dark border{% endif %} me-2">
-                                        #{{ forloop.counter }}
-                                    </span>
-                                    <a href="{% url 'post_detail' slug=stat.post.slug %}" class="fw-bold text-decoration-none text-dark flex-grow-1 text-truncate">
-                                        {{ stat.post.title }}
-                                    </a>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center text-muted small mt-2">
-                                    <div>
-                                        <span class="me-2" title="Views">&#128065; {{ stat.views }}</span>
-                                        <span class="me-2" title="Likes">&hearts; {{ stat.likes }}</span>
-                                        <span title="Comments">&#128172; {{ stat.comments }}</span>
-                                    </div>
-                                    <span class="badge bg-primary-subtle text-primary-emphasis rounded-pill">
-                                        Score: {{ stat.score|floatformat:2 }}
-                                    </span>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="p-4 text-center text-muted small">
-                        No trending data computed yet.<br>
-                        Run <code>compute_trending</code> to populate.
-                    </div>
-                {% endif %}
-            </div>
-            <div class="card-footer bg-light text-muted small py-2 text-center">
-                Ranked using engagement &amp; time decay
+
+            <!-- All Caught Up Message -->
+            <div id="end-of-feed" class="{% if page_obj.has_next %}d-none{% endif %} py-4 text-muted text-center">
+                <i class="bi bi-check2-circle text-success fs-3 d-block mb-1"></i>
+                <div class="fw-semibold">You're all caught up!</div>
+                <small class="text-secondary">You have reached the end of the post feed.</small>
             </div>
         </div>
-    </div>
+
+        <!-- NoScript Fallback for Endless Scroll -->
+        <noscript>
+            <div class="text-center my-4">
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="btn btn-outline-primary rounded-pill px-4">
+                        Next Page &rarr;
+                    </a>
+                {% endif %}
+            </div>
+        </noscript>
+    {% endif %}
 </div>
+
+<script>
+(function() {
+    let col0 = null;
+    let col1 = null;
+    let col2 = null;
+    let col3 = null;
+    let sentinel = null;
+    let loadingSpinner = null;
+    let loadingError = null;
+    let endOfFeed = null;
+    let retryBtn = null;
+
+    const loadedPostIds = new Set();
+    let currentPage = 1;
+    let isLoading = false;
+    let hasMorePages = {{ page_obj.has_next|yesno:"true,false" }};
+    let observer = null;
+    let isRestoring = false;
+
+    // Single source of truth for responsive masonry column count:
+    // 4 columns at 1200px and wider, 3 from 900px, 2 from 576px, 1 below that
+    const COLUMN_BREAKPOINTS = [
+        { minWidth: 1200, cols: 4 },
+        { minWidth: 900,  cols: 3 },
+        { minWidth: 576,  cols: 2 },
+        { minWidth: 0,    cols: 1 }
+    ];
+
+    function getTargetColumnCount() {
+        const width = window.innerWidth;
+        for (const bp of COLUMN_BREAKPOINTS) {
+            if (width >= bp.minWidth) return bp.cols;
+        }
+        return 1;
+    }
+
+    function getAllColumns() {
+        return [col0, col1, col2, col3].filter(Boolean);
+    }
+
+    // Determine active column containers based on responsive screen width
+    function getActiveColumns() {
+        const count = getTargetColumnCount();
+        const allCols = getAllColumns();
+        allCols.forEach((col, idx) => {
+            if (idx < count) {
+                col.style.display = 'flex';
+            } else {
+                col.style.display = 'none';
+            }
+        });
+        return allCols.slice(0, count);
+    }
+
+    // Append card to shortest active column
+    function appendCardToShortest(cardEl) {
+        const activeCols = getActiveColumns();
+        if (activeCols.length === 0) return;
+        let shortest = activeCols[0];
+        for (let i = 1; i < activeCols.length; i++) {
+            if (activeCols[i].offsetHeight < shortest.offsetHeight) {
+                shortest = activeCols[i];
+            }
+        }
+        shortest.appendChild(cardEl);
+    }
+
+    // Rebalance existing cards when window crosses breakpoint without reloading
+    let currentColumnCount = getTargetColumnCount();
+    let resizeTimer = null;
+
+    function rebalanceColumns() {
+        const allCols = getAllColumns();
+        if (allCols.length === 0) return;
+        const allCards = Array.from(document.querySelectorAll('.post-feed-card'));
+        allCols.forEach(c => c.innerHTML = '');
+        allCards.forEach(c => appendCardToShortest(c));
+    }
+
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            const newCount = getTargetColumnCount();
+            if (newCount !== currentColumnCount) {
+                currentColumnCount = newCount;
+                rebalanceColumns();
+            }
+        }, 120);
+    });
+
+    // Color gradient cycler for cards without an image
+    const gradients = [
+        'linear-gradient(135deg, #1e293b 0%, #3b82f6 100%)',
+        'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)',
+        'linear-gradient(135deg, #b45309 0%, #f59e0b 100%)',
+        'linear-gradient(135deg, #6d28d9 0%, #a855f7 100%)',
+        'linear-gradient(135deg, #0369a1 0%, #38bdf8 100%)'
+    ];
+
+    function createCardElement(post) {
+        const article = document.createElement('article');
+        article.className = 'card post-feed-card border-0 rounded-4 overflow-hidden shadow-sm';
+        article.dataset.postId = post.id;
+
+        const flameBadgeHtml = post.trending_rank 
+            ? `<span class="position-absolute top-0 start-0 m-2 badge bg-danger text-white rounded-pill px-2 py-0.5 shadow-sm d-inline-flex align-items-center gap-1" style="font-size: 0.7rem;"><i class="bi bi-fire"></i> #${post.trending_rank}</span>` 
+            : '';
+
+        let mediaHtml = '';
+        if (post.image_url) {
+            const aspectStyle = (post.image_width && post.image_height) 
+                ? `style="aspect-ratio: ${post.image_width} / ${post.image_height}; object-fit: cover;" width="${post.image_width}" height="${post.image_height}"` 
+                : 'style="max-height: 360px; object-fit: cover;"';
+            mediaHtml = `
+                <div class="position-relative">
+                    <a href="/post/${post.slug}/" class="d-block overflow-hidden" style="background-color: var(--surface-2);">
+                        <img src="${post.image_url}" 
+                             alt="${post.image_alt || post.title}" 
+                             class="w-100 card-post-img" 
+                             loading="lazy" 
+                             decoding="async" 
+                             ${aspectStyle}>
+                    </a>
+                    ${flameBadgeHtml}
+                </div>
+            `;
+        } else {
+            const grad = gradients[post.id % gradients.length];
+            mediaHtml = `
+                <a href="/post/${post.slug}/" class="text-decoration-none">
+                    <div class="post-color-block p-3 text-white text-center position-relative d-flex align-items-center justify-content-center" 
+                         style="min-height: 140px; background: ${grad};">
+                        <h3 class="h6 fw-bold text-white mb-0 px-1 line-clamp-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35;">${post.title}</h3>
+                        ${flameBadgeHtml}
+                    </div>
+                </a>
+            `;
+        }
+
+        let tagsHtml = '';
+        if (post.tags && post.tags.length > 0) {
+            // Limited to 2 chips on one line for narrower 4-col layout
+            const visibleTags = post.tags.slice(0, 2);
+            tagsHtml = `
+                <div class="mb-2 d-flex flex-nowrap gap-1 overflow-hidden">
+                    ${visibleTags.map(t => `<a href="/tag/${encodeURIComponent(t)}/" class="badge bg-light text-secondary border text-decoration-none text-truncate" style="font-size: 0.68rem; max-width: 105px;">#${t}</a>`).join('')}
+                </div>
+            `;
+        }
+
+        const titleHtml = post.image_url ? `
+            <h2 class="h6 card-title mb-1 fw-bold" style="font-size: 0.88rem; line-height: 1.35;">
+                <a href="/post/${post.slug}/" class="text-dark text-decoration-none post-title-link" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                    ${post.title}
+                </a>
+            </h2>
+        ` : '';
+
+        article.innerHTML = `
+            ${mediaHtml}
+            <div class="card-body p-2.5" style="padding: 0.75rem;">
+                ${titleHtml}
+                ${post.summary ? `<p class="text-muted small mb-1.5" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.78rem; line-height: 1.35;">${post.summary}</p>` : ''}
+                ${tagsHtml}
+                <div class="d-flex justify-content-between align-items-center pt-1.5 border-top border-light-subtle text-muted" style="font-size: 0.72rem;">
+                    <span class="d-flex align-items-center gap-1 text-truncate" style="max-width: 105px;">
+                        <i class="bi bi-person-circle text-secondary"></i>
+                        <span class="fw-semibold text-truncate">${post.author}</span>
+                    </span>
+                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                        <span title="Likes"><i class="bi bi-heart text-danger me-0.5"></i> ${post.likes_count}</span>
+                        <span title="Comments"><i class="bi bi-chat-text text-secondary me-0.5"></i> ${post.comments_count}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        return article;
+    }
+
+    function fetchBatch(pageNum) {
+        return fetch(`/posts/feed/?page=${pageNum}`, {
+            headers: { 'Cache-Control': 'no-cache' }
+        }).then(res => {
+            if (!res.ok) throw new Error('Network error ' + res.status);
+            return res.json();
+        });
+    }
+
+    function appendBatchPosts(posts) {
+        if (!posts || posts.length === 0) return;
+        posts.forEach(post => {
+            if (!loadedPostIds.has(post.id)) {
+                loadedPostIds.add(post.id);
+                const cardEl = createCardElement(post);
+                appendCardToShortest(cardEl);
+            }
+        });
+    }
+
+    function loadNextBatch() {
+        if (isLoading || !hasMorePages || isRestoring) return;
+        isLoading = true;
+        if (loadingError) loadingError.classList.add('d-none');
+        if (loadingSpinner) loadingSpinner.classList.remove('d-none');
+
+        const nextPageNum = currentPage + 1;
+        fetchBatch(nextPageNum)
+            .then(data => {
+                currentPage = nextPageNum;
+                hasMorePages = data.has_next;
+                appendBatchPosts(data.posts);
+                try {
+                    sessionStorage.setItem('feed_loaded_pages', currentPage);
+                } catch (e) {}
+
+                if (loadingSpinner) loadingSpinner.classList.add('d-none');
+                isLoading = false;
+
+                if (!hasMorePages) {
+                    if (observer) observer.disconnect();
+                    if (endOfFeed) endOfFeed.classList.remove('d-none');
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching next posts batch:', err);
+                if (loadingSpinner) loadingSpinner.classList.add('d-none');
+                if (loadingError) loadingError.classList.remove('d-none');
+                isLoading = false;
+            });
+    }
+
+    async function restoreFeedState() {
+        let savedPages = 1;
+        let savedScroll = 0;
+        try {
+            savedPages = parseInt(sessionStorage.getItem('feed_loaded_pages') || '1', 10);
+            savedScroll = parseFloat(sessionStorage.getItem('feed_scroll_pos') || '0');
+        } catch (e) {}
+
+        if (savedPages > 1) {
+            isRestoring = true;
+            if (loadingSpinner) loadingSpinner.classList.remove('d-none');
+            for (let p = 2; p <= savedPages; p++) {
+                try {
+                    const data = await fetchBatch(p);
+                    currentPage = p;
+                    hasMorePages = data.has_next;
+                    appendBatchPosts(data.posts);
+                    if (!hasMorePages) break;
+                } catch (e) {
+                    console.error('Error restoring feed batch ' + p, e);
+                    break;
+                }
+            }
+            if (loadingSpinner) loadingSpinner.classList.add('d-none');
+            isRestoring = false;
+
+            if (savedScroll > 0) {
+                requestAnimationFrame(() => {
+                    window.scrollTo({ top: savedScroll, behavior: 'instant' });
+                });
+            }
+            if (!hasMorePages) {
+                if (observer) observer.disconnect();
+                if (endOfFeed) endOfFeed.classList.remove('d-none');
+            }
+        }
+    }
+
+    function setupObserver() {
+        if (observer) {
+            observer.disconnect();
+            observer = null;
+        }
+        if (hasMorePages && sentinel && 'IntersectionObserver' in window) {
+            observer = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting && !isLoading && !isRestoring && hasMorePages) {
+                    loadNextBatch();
+                }
+            }, { rootMargin: '400px 0px' });
+            observer.observe(sentinel);
+        }
+    }
+
+    function initFeed(isPageShow) {
+        col0 = document.getElementById('col-0');
+        col1 = document.getElementById('col-1');
+        col2 = document.getElementById('col-2');
+        col3 = document.getElementById('col-3');
+        sentinel = document.getElementById('scroll-sentinel');
+        loadingSpinner = document.getElementById('loading-spinner');
+        loadingError = document.getElementById('loading-error');
+        endOfFeed = document.getElementById('end-of-feed');
+        retryBtn = document.getElementById('retry-batch-btn');
+
+        if (!col0) return; // No feed on page
+
+        // Ensure active columns display matches screen width
+        getActiveColumns();
+
+        // Populate loaded IDs from server-rendered HTML
+        document.querySelectorAll('.post-feed-card').forEach(el => {
+            if (el.dataset.postId) loadedPostIds.add(parseInt(el.dataset.postId, 10));
+        });
+
+        // Setup Retry button
+        if (retryBtn) {
+            retryBtn.onclick = function() {
+                loadNextBatch();
+            };
+        }
+
+        // Rebalance on initial load if opening on smaller screen (< 1200px)
+        if (getTargetColumnCount() < 4 && !isPageShow) {
+            rebalanceColumns();
+        }
+
+        isLoading = false;
+        setupObserver();
+
+        if (!isPageShow) {
+            restoreFeedState();
+        }
+    }
+
+    function saveScrollPosition() {
+        try {
+            sessionStorage.setItem('feed_scroll_pos', window.scrollY);
+            sessionStorage.setItem('feed_loaded_pages', currentPage);
+        } catch (e) {}
+    }
+
+    window.addEventListener('beforeunload', saveScrollPosition);
+    window.addEventListener('pagehide', saveScrollPosition);
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('a');
+        if (link && !link.getAttribute('href').startsWith('#')) {
+            saveScrollPosition();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        initFeed(false);
+    });
+
+    window.addEventListener('pageshow', function(event) {
+        initFeed(true);
+        if (event.persisted) {
+            isLoading = false;
+            isRestoring = false;
+            setupObserver();
+        }
+    });
+})();
+</script>
 {% endblock %}
