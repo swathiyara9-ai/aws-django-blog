@@ -227,6 +227,21 @@ def _determine_mock_mode():
 
 AI_MOCK_MODE = _determine_mock_mode()
 
+# Deployment Security & Cookie Settings (switchable via environment variables for HTTPS)
+# In production with an SSL/TLS certificate (e.g. ACM / CloudFront / Certbot), set these to True in .env
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False').lower() in ('true', '1', 'yes')
+SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'False').lower() in ('true', '1', 'yes')
+CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'False').lower() in ('true', '1', 'yes')
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+# HTTP Strict Transport Security (HSTS) - enabled only when SECURE_HSTS_SECONDS is set > 0 in .env
+SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0'))
+if SECURE_HSTS_SECONDS > 0:
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
 import sys
 if "test" in sys.argv:
     # Fast password hasher for tests only (never used in production)

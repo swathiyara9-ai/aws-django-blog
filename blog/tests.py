@@ -658,6 +658,25 @@ class FeedNavigationAndNotificationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'image/svg+xml')
 
+    def test_post_card_image_onerror_and_aspect_ratio_placeholders(self):
+        """Post card template includes onerror fallback, aspect-ratio placeholders, and containment."""
+        Post.objects.create(
+            title="Image Fallback Verification Post",
+            slug="image-fallback-verification-post",
+            body="Post testing image fallback and onerror handling.",
+            author=self.user,
+            status="published",
+            image="posts/test_image.jpg",
+            image_width=800,
+            image_height=600,
+        )
+        response = self.client.get(reverse('post_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'handlePostImgError(this)')
+        self.assertContains(response, 'post-img-wrapper')
+        self.assertContains(response, 'post-color-block-fallback')
+        self.assertContains(response, 'aspect-ratio: 800 / 600')
+
 
 
 

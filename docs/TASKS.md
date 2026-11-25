@@ -97,7 +97,11 @@ Done when: network diagram matches `ARCHITECTURE.md`.
 - [x] Favicon route (`/favicon.ico`) and SVG link to eliminate console 404s
 - [x] Feed endpoint cache prevention (`Cache-Control: no-store`) with error state and interactive retry button
 - [x] 4-column desktop masonry layout (4 cols >= 1200px, 3 cols from 900px, 2 cols from 576px, 1 col below), single-config breakpoint rebalancer, 16-post batching (server & API), narrower cards (compact padding, 2-line title ellipsis, max 2 tags, single-line author/counts)
-Done when: posts and images save to RDS and S3 from an EC2 test instance, and cloud activity telemetry is observable.
+- [x] Seed demo management command (`python manage.py seed_demo --yes`) creating 12 realistic users, posts, tags, comments, likes, and trending scores with `--yes` safety gate
+- [x] Final submission wrap-up: Comprehensive README rewrite with honest status table, architecture diagram, settings reference, and local run guide
+- [x] Documentation suite: Real-state ARCHITECTURE.md, in-app Architecture template, DEPLOYMENT.md runbook, TESTING.md manual checklist, and VIVA.md (15 Q&As)
+- [x] Security audit & deployment validation: Repo scanned for secrets (0 leaked keys), .env.example updated with placeholders, .gitignore verified, and python manage.py check --deploy verified clean
+Done when: posts and images save to RDS and S3 from an EC2 test instance, cloud activity telemetry is observable, and full submission documentation is verified.
 
 ## Phase 9 — EC2, ALB and Auto Scaling
 - [ ] Launch template with user-data script that installs and starts the app

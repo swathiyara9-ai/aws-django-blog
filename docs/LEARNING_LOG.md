@@ -275,6 +275,25 @@ After every phase, add an entry. Keep answers in your own words.
    A: The layout defines a single JavaScript breakpoint structure `COLUMN_BREAKPOINTS`. A debounced resize event listener checks if the active column count changed. If so, it preserves the DOM array of `.post-feed-card` elements, clears the column containers, and sequentially appends each card to the currently shortest active column. Cards stay in chronological order and heights remain balanced without any network requests.
 **Can I honestly put this on my resume?** Yes — Built a responsive 4-column Masonry feed with dynamic runtime rebalancing and optimized compact card typography.
 
+---
+
+## Phase 8.6 — Final Submission Wrap-Up & Production Readiness (November 25, 2026)
+**What I built:** Completed the final submission wrap-up for academic review. Rewrote `README.md` with an honest implementation status table, high-level Mermaid architecture diagram, tech stack, environment variable reference, and local setup guide. Updated `docs/ARCHITECTURE.md` and `templates/blog/architecture.html` to strictly reflect the real deployed single-instance EC2, RDS PostgreSQL, and S3 state, clearly labelling ALB, ASG, CloudFront, and Lambda as `[Planned]`. Authored `docs/DEPLOYMENT.md` detailing the production runbook (Nginx reverse proxy, Gunicorn systemd daemon, RDS VPC configuration, and S3 IAM Instance Profile). Authored `docs/TESTING.md` documenting the 63 automated tests and full manual test checklist. Created `docs/VIVA.md` with 15 detailed viva/interview questions with clear, plain-English answers. Created the `seed_demo` management command with `--yes` safety flag creating 12 realistic users, posts, comments, likes, and trending scores. Conducted a comprehensive security scan confirming zero leaked API keys, tokens, or private IPs, verified `.gitignore` coverage, and verified clean output for `python manage.py check --deploy`.
+**New concepts:**
+- Production Deployment Hardening (`check --deploy`) — Django's built-in deployment checker inspects critical security flags (`DEBUG`, `SECRET_KEY`, HSTS, secure session/CSRF cookies, XSS protection). Wiring these to environment variables allows smooth transition between HTTP development and HTTPS production.
+- Management Command Safety Gates — Using required confirmation arguments (like `--yes`) in CLI commands that seed or modify data prevents accidental execution in production databases.
+- Principle of Least Privilege in Cloud IAM — Attaching IAM roles to EC2 instances using Instance Profiles (rather than embedding static API credentials) guarantees that permissions (`s3:PutObject`, `bedrock:InvokeModel`) are temporary, automatically rotated via STS, and bounded to specific ARNs.
+**Problems faced and fixes:**
+- `seed_demo` initially threw `AttributeError` when recording simulated post views: corrected the view simulation to instantiate `PostView` objects with hashed visitor fingerprints and invoked `update_single_post_stats()` directly.
+- `check --deploy` flagged cookie and HSTS warnings: configured `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, and `SECURE_HSTS_SECONDS` in `settings.py` controlled by environment variables so they can be switched on cleanly when HTTPS is enabled.
+**Likely questions and my answers:**
+1. Q: Why is it important to clearly differentiate between "Deployed" and "Planned" architecture components in your project submission?
+   A: Academic and engineering honesty is paramount. Claiming an Application Load Balancer or Auto Scaling Group is actively running when the current deployment runs on a cost-effective single EC2 instance is misleading. Clearly marking components as `[Planned]` demonstrates that the architectural blueprint is designed for future scale without making false claims about the current active infrastructure.
+2. Q: How does the application prevent credential leaks in production?
+   A: Zero AWS access keys or passwords exist in the source code or git history. The EC2 instance assumes an IAM Instance Profile (`EC2-Django-App-Role`) via AWS IMDSv2. Database credentials, Django `SECRET_KEY`, and bucket names are injected at runtime via an ignored `.env` file following Twelve-Factor App principles.
+**Can I honestly put this on my resume?** Yes — Built and deployed a production-ready Django 5.2 cloud application on AWS (EC2, RDS PostgreSQL, S3, Bedrock Nova Lite) with comprehensive test coverage, security hardening, automated data seeding, and architecture documentation.
+
+
 
 
 

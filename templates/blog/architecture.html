@@ -33,78 +33,78 @@
 
     <!-- Architectural Tiers Grid -->
     <div class="row g-4 mb-4">
-        <!-- 1. Edge & DNS -->
+        <!-- 1. Edge & DNS [Planned] -->
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 border-0 rounded-4 shadow-sm p-4 bg-white">
                 <div class="d-flex align-items-center justify-content-between mb-3">
-                    <div class="p-2 rounded-3 bg-primary-subtle text-primary">
+                    <div class="p-2 rounded-3 bg-secondary-subtle text-secondary">
                         <i class="bi bi-globe2 fs-4"></i>
                     </div>
-                    <span class="badge bg-light text-muted border">Edge Tier</span>
+                    <span class="badge bg-secondary-subtle text-secondary border">Planned</span>
                 </div>
                 <h2 class="h5 fw-bold mb-2">Amazon CloudFront &amp; Route 53</h2>
                 <p class="text-muted small mb-3">
-                    Global DNS resolution via Route 53 paired with CloudFront edge caching for static assets, low latency delivery, and SSL termination.
+                    [Planned] Global DNS routing via Route 53 and CloudFront edge CDN caching for static/media assets and SSL offloading.
                 </p>
                 <ul class="list-unstyled small text-secondary mb-0">
-                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> HTTPS / TLS 1.3 encryption</li>
-                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> AWS Shield DDoS mitigation</li>
+                    <li><i class="bi bi-hourglass-split text-secondary me-1"></i> HTTPS / TLS 1.3 via ACM (Planned)</li>
+                    <li><i class="bi bi-hourglass-split text-secondary me-1"></i> Edge caching for scale (Planned)</li>
                 </ul>
             </div>
         </div>
 
-        <!-- 2. Load Balancing -->
+        <!-- 2. Load Balancing [Planned] -->
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 border-0 rounded-4 shadow-sm p-4 bg-white">
                 <div class="d-flex align-items-center justify-content-between mb-3">
-                    <div class="p-2 rounded-3 bg-info-subtle text-info">
+                    <div class="p-2 rounded-3 bg-secondary-subtle text-secondary">
                         <i class="bi bi-distribute-vertical fs-4"></i>
                     </div>
-                    <span class="badge bg-light text-muted border">Networking</span>
+                    <span class="badge bg-secondary-subtle text-secondary border">Planned</span>
                 </div>
                 <h2 class="h5 fw-bold mb-2">Application Load Balancer</h2>
                 <p class="text-muted small mb-3">
-                    Internet-facing ALB placed in public subnets across 2 Availability Zones, directing HTTP/HTTPS traffic to target groups.
+                    [Planned] Internet-facing ALB in public subnets across 2 Availability Zones for automated health check routing.
                 </p>
                 <ul class="list-unstyled small text-secondary mb-0">
-                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> Port 80 &amp; 443 listeners</li>
-                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> Target health check: <code>/health/</code></li>
+                    <li><i class="bi bi-hourglass-split text-secondary me-1"></i> Multi-AZ traffic distribution (Planned)</li>
+                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> Health check endpoint: <code>/health/</code> (Ready)</li>
                 </ul>
             </div>
         </div>
 
-        <!-- 3. Compute Tier -->
+        <!-- 3. Compute Tier [Deployed] -->
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 border-0 rounded-4 shadow-sm p-4 bg-white">
+            <div class="card h-100 border-0 rounded-4 shadow-sm p-4 bg-white border-primary">
                 <div class="d-flex align-items-center justify-content-between mb-3">
-                    <div class="p-2 rounded-3 bg-warning-subtle text-warning">
+                    <div class="p-2 rounded-3 bg-primary-subtle text-primary">
                         <i class="bi bi-hdd-network fs-4"></i>
                     </div>
-                    <span class="badge bg-light text-muted border">Compute Tier</span>
+                    <span class="badge bg-success-subtle text-success border">Deployed (EC2)</span>
                 </div>
-                <h2 class="h5 fw-bold mb-2">EC2 Auto Scaling Group</h2>
+                <h2 class="h5 fw-bold mb-2">EC2 &amp; Gunicorn WSGI</h2>
                 <p class="text-muted small mb-3">
-                    Amazon Linux 2023 instances running Gunicorn WSGI and Django 5.2. Protected in private subnets with strict security groups.
+                    Amazon Linux 2023 instance running Nginx reverse proxy, Gunicorn WSGI, and Django 5.2. (Auto Scaling Group is Planned).
                 </p>
                 <ul class="list-unstyled small text-secondary mb-0">
-                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> IAM Instance Profile authentication</li>
+                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> IAM Instance Profile (Zero hardcoded keys)</li>
                     <li><i class="bi bi-check-circle-fill text-success me-1"></i> WhiteNoise static asset serving</li>
                 </ul>
             </div>
         </div>
 
-        <!-- 4. Database Tier -->
+        <!-- 4. Database Tier [Deployed] -->
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 border-0 rounded-4 shadow-sm p-4 bg-white">
                 <div class="d-flex align-items-center justify-content-between mb-3">
                     <div class="p-2 rounded-3 bg-success-subtle text-success">
                         <i class="bi bi-database-fill-gear fs-4"></i>
                     </div>
-                    <span class="badge bg-light text-muted border">Database</span>
+                    <span class="badge bg-success-subtle text-success border">Deployed (RDS)</span>
                 </div>
-                <h2 class="h5 fw-bold mb-2">Amazon RDS Multi-AZ</h2>
+                <h2 class="h5 fw-bold mb-2">Amazon RDS PostgreSQL</h2>
                 <p class="text-muted small mb-3">
-                    Managed relational database deployed in private subnets. Encrypted at rest via AWS KMS with automated backups.
+                    Managed relational database deployed in private subnets, accessible only from the EC2 security group on port 5432.
                 </p>
                 <ul class="list-unstyled small text-secondary mb-0">
                     <li><i class="bi bi-check-circle-fill text-success me-1"></i> Engine: <strong id="arch-db-engine">PostgreSQL</strong></li>
@@ -113,42 +113,42 @@
             </div>
         </div>
 
-        <!-- 5. Object Storage -->
+        <!-- 5. Object Storage [Deployed] -->
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 border-0 rounded-4 shadow-sm p-4 bg-white">
                 <div class="d-flex align-items-center justify-content-between mb-3">
                     <div class="p-2 rounded-3 bg-danger-subtle text-danger">
                         <i class="bi bi-folder-fill fs-4"></i>
                     </div>
-                    <span class="badge bg-light text-muted border">Storage</span>
+                    <span class="badge bg-success-subtle text-success border">Deployed (S3)</span>
                 </div>
                 <h2 class="h5 fw-bold mb-2">Amazon S3 Media Storage</h2>
                 <p class="text-muted small mb-3">
-                    Bucket <code>aws-django-blog-media-20261119</code> in <code>ap-southeast-2</code> storing user-uploaded media files with SigV4 signed URLs.
+                    Bucket <code>aws-django-blog-media-20261119</code> in Sydney storing post hero images with Block Public Access enabled.
                 </p>
                 <ul class="list-unstyled small text-secondary mb-0">
                     <li><i class="bi bi-check-circle-fill text-success me-1"></i> django-storages S3 backend</li>
-                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> Querystring signed URL access</li>
+                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> SigV4 querystring signed URLs</li>
                 </ul>
             </div>
         </div>
 
-        <!-- 6. Generative AI Engine -->
+        <!-- 6. Generative AI Engine [Demo/Live Ready] -->
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 border-0 rounded-4 shadow-sm p-4 bg-white">
                 <div class="d-flex align-items-center justify-content-between mb-3">
                     <div class="p-2 rounded-3 text-purple" style="background-color: #f3e8ff; color: #7c3aed;">
                         <i class="bi bi-cpu-fill fs-4"></i>
                     </div>
-                    <span class="badge bg-light text-muted border">GenAI Tier</span>
+                    <span class="badge bg-info-subtle text-info border">Demo &amp; Live Ready</span>
                 </div>
-                <h2 class="h5 fw-bold mb-2">Amazon Bedrock</h2>
+                <h2 class="h5 fw-bold mb-2">Amazon Bedrock GenAI</h2>
                 <p class="text-muted small mb-3">
-                    Serverless AI inference using Amazon Nova Lite (<code>amazon.nova-lite-v1:0</code>) in Sydney for smart titles, hashtags, and summaries.
+                    Serverless AI inference using Amazon Nova Lite (<code>amazon.nova-lite-v1:0</code>) in Sydney with offline mock fallback.
                 </p>
                 <ul class="list-unstyled small text-secondary mb-0">
-                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> Strictly scoped IAM InvokeModel policy</li>
-                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> Zero hardcoded model constants</li>
+                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> Scoped IAM <code>bedrock:InvokeModel</code></li>
+                    <li><i class="bi bi-check-circle-fill text-success me-1"></i> Offline Mock AI tested and operational</li>
                 </ul>
             </div>
         </div>
